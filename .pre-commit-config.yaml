@@ -6,20 +6,20 @@ repos:
         args: [--allow-multiple-documents]
       - id: check-json
       - id: trailing-whitespace
-  
+
   - repo: https://github.com/psf/black
     rev: 25.1.0
     hooks:
       - id: black
         exclude: "^(venv|__jac_gen__)/"  # Ensure these match your actual directories
-  
+
   - repo: https://github.com/PyCQA/isort
     rev: 6.0.1
     hooks:
       - id: isort
         exclude: "^(venv|__jac_gen__)/"
         args: ["--profile", "black"]
-  
+
   - repo: https://github.com/PyCQA/flake8
     rev: 7.1.2
     hooks:
@@ -33,7 +33,7 @@ repos:
           - flake8_annotations
           - flake8_simplify
         exclude: "^(venv|__jac_gen__)/"
-  
+
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.15.0
     hooks:
@@ -46,7 +46,7 @@ repos:
         additional_dependencies:
           - types-PyYAML
           - types-requests
-  
+
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:

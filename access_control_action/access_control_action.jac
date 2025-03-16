@@ -3,14 +3,14 @@ import:jac from jivas.agent.action.action { Action }
 
 node AccessControlAction :Action: {
     # allows access control permissions to be defined per channel, action and session_id; maintains perm configs as a record of session_ids and associated role
-    
+
     has exceptions:list = []; # collection of actions which are exempt from permissions
 
     has permissions:dict = {
         "default": { # channel
             "any":{ # resource, e.g. action type; 'any' is default
                 "deny":[], # can accommodate specific session ids, session group name or 'all'
-                "allow":["all"] # can accommodate specific session ids, session group name or 'all' 
+                "allow":["all"] # can accommodate specific session ids, session group name or 'all'
             }
         },
         "whatsapp": {
@@ -59,7 +59,7 @@ node AccessControlAction :Action: {
         }
         return False;
     }
-    
+
 
     can has_action_access(session_id:str, action_label:str, channel:str="default") {
         # executes any attached and enabled whatsapp whitelist actions
@@ -73,51 +73,51 @@ node AccessControlAction :Action: {
                     if("deny" in self.permissions[channel][action_label].keys()) {
 
                         if  "all" in self.permissions[channel][action_label]["deny"]
-                            or session_id in self.permissions[channel][action_label]["deny"] 
+                            or session_id in self.permissions[channel][action_label]["deny"]
                             or self.in_session_group(session_id, self.permissions[channel][action_label]["deny"]) {
                             return False;
-                        }   
+                        }
                     }
 
                     if("allow" in self.permissions[channel][action_label].keys()) {
 
                         if  "all" in self.permissions[channel][action_label]["allow"]
-                            or session_id in self.permissions[channel][action_label]["allow"] 
+                            or session_id in self.permissions[channel][action_label]["allow"]
                             or self.in_session_group(session_id, self.permissions[channel][action_label]["allow"]) {
                             return True;
-                        }                      
+                        }
                     }
- 
+
                 } elif("any" in self.permissions[channel].keys()) {
                     # Then check 'any' action permissions as a fallback
 
                     if("deny" in self.permissions[channel]['any'].keys()) {
-                        
+
                         if  "all" in self.permissions[channel]['any']["deny"]
-                            or session_id in self.permissions[channel]['any']["deny"] 
+                            or session_id in self.permissions[channel]['any']["deny"]
                             or self.in_session_group(session_id, self.permissions[channel]['any']["deny"]) {
                             return False;
-                        }   
+                        }
 
                     }
 
                     if("allow" in self.permissions[channel]['any'].keys()) {
-                        
+
                         if  "all" in self.permissions[channel]['any']["allow"]
-                            or session_id in self.permissions[channel]['any']["allow"] 
+                            or session_id in self.permissions[channel]['any']["allow"]
                             or self.in_session_group(session_id, self.permissions[channel]['any']["allow"]) {
                             return True;
-                        }   
+                        }
 
                     }
-                    
+
                 }
             }
 
             return False;
         } else {
             return True;
-        }           
+        }
     }
 
 
@@ -128,7 +128,7 @@ node AccessControlAction :Action: {
                 # Define allowed and required keys
                 allowed_channels = ["default", "whatsapp", "facebook"];
                 required_channels = ["deny", "allow"];
-                
+
                 # Iterate over each channel in the 'permissions'
                 for channel in self.permissions.keys() {
                     if (channel in allowed_channels) {
@@ -137,7 +137,7 @@ node AccessControlAction :Action: {
                             for access in self.permissions[channel] {
                                 # Get the resource value for this access
                                 resource_value = self.permissions[channel][access];
-                                
+
                                 if (type(resource_value) == dict) {
                                     # Check each required access exists
                                     for required_channel in required_channels {
