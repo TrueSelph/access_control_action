@@ -71,6 +71,11 @@ jobs:
           jvcli login --username ${{ secrets.JIVAS_USERNAME }} --password ${{ secrets.JIVAS_PASSWORD }}
           jvcli publish action --path access_control_action --visibility public
 
+      - name: Configure Git
+        run: |
+          git config --global user.email "admin@trueselph.com"
+          git config --global user.name "TrueSelph Inc."
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
