@@ -70,3 +70,9 @@ jobs:
           echo "Publishing new version to Jivas Package Registry..."
           jvcli login --username ${{ secrets.JIVAS_USERNAME }} --password ${{ secrets.JIVAS_PASSWORD }}
           jivas publish action --path access_control_action --visibility public
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create v${{ needs.check-version.outputs.new_version }} dist/* --title "Release v${{ needs.check-version.outputs.new_version }}" --notes "Automated release for version v${{ needs.check-version.outputs.new_version }}.
