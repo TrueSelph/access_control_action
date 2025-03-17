@@ -11,7 +11,7 @@ repos:
     rev: 25.1.0
     hooks:
       - id: black
-        exclude: "^(venv|__jac_gen__)/"  # Ensure these match your actual directories
+        exclude: "^(venv|__jac_gen__)/"
 
   - repo: https://github.com/PyCQA/isort
     rev: 6.0.1
