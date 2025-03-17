@@ -75,4 +75,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create v${{ needs.check-version.outputs.new_version }} dist/* --title "Release v${{ needs.check-version.outputs.new_version }}" --notes "Automated release for version v${{ needs.check-version.outputs.new_version }}."
+          echo "Creating GitHub release..."
+          VERSION=${{ needs.check-version.outputs.new_version }}
+          git tag -a "v$VERSION" -m "Release version $VERSION"
+          git push origin "v$VERSION"
+          gh release create "v$VERSION" --title "Release version $VERSION" --notes "Release version $VERSION" --generate-notes
+          echo "Release created successfully."
