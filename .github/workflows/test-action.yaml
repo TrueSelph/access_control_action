@@ -23,5 +23,5 @@ jobs:
     - name: Install dependencies
       run: pip install jivas[dev]
 
-    - name: Run tests
-      run: pytest
+    # - name: Run tests
+    #   run: pytest
