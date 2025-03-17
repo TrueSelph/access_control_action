@@ -69,7 +69,7 @@ jobs:
         run: |
           echo "Publishing new version to Jivas Package Registry..."
           jvcli login --username ${{ secrets.JIVAS_USERNAME }} --password ${{ secrets.JIVAS_PASSWORD }}
-          jivas publish action --path access_control_action --visibility public
+          jvcli publish action --path access_control_action --visibility public
 
       - name: Create GitHub Release
         env:
