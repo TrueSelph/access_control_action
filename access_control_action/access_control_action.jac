@@ -65,6 +65,12 @@ node AccessControlAction :Action: {
         # executes any attached and enabled whatsapp whitelist actions
 
         if(self.enabled) {
+            # if no channel we assume default
+            if(not channel) {
+                # set channel default
+                channel = "default";
+            }
+
             # Check if channel exists in permissions
             if(channel in self.permissions.keys()) {
                  # First check specific action permission
