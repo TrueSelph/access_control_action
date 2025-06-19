@@ -215,3 +215,95 @@ Properly configuring permissions using the Access Control Action ensures your pl
 ## 🎗 License
 
 This project is protected under the Apache License 2.0. See [LICENSE](../LICENSE) for more information.
+
+
+collection >>
+
+channel - default, fb, whatsapp
+
+
+action_perm
+    label any or action name
+
+edges
+    allow class > group_node > user_node || > user_node (all)
+    deny class
+
+
+
+- action: jivas/access_control_action
+  context:
+    enabled: true
+    version: ~0.0.1
+    permissions:
+      default: (AnyChannel)
+      default: (Channel)
+        DHBReportInterviewInteractAction: (Resource)
+          allow: (Allow - edge)
+          - dhb_staff (Group)
+          deny: [] (Deny - edge)
+        any: (AnyResource)
+          allow:
+          - all (AnyGroup)
+          deny: []
+      facebook:
+        DHBReportInterviewInteractAction:
+          allow:
+          - dhb_staff
+          deny: []
+        any:
+          allow:
+          - all
+          deny: []
+      whatsapp:
+        DHBReportInterviewInteractAction:
+          allow:
+          - dhb_staff
+          deny: []
+        any:
+          allow:
+          - all
+          deny: []
+    session_groups:
+      dhb_staff:
+      - '5926431530' (User)
+      - '5926415808'
+      - '5926236145'
+      - '5926236142'
+      - '5926233511'
+      - '5926233028'
+      - '5926236155'
+      - '5926757449'
+      - '5926740705'
+      - '5926146590'
+      - '5926670941'
+      - '5926578537'
+      - '5926604824'
+      - '5926236155'
+      - '5926595999'
+      - '5926236145'
+      - '5927047995'
+
+
+
+
+
+
+
+
+
+difference between anygroup, group and user
+
+{
+    "any": {
+        "any":{
+            "deny":[],
+            "allow":["all", "any"]
+        }
+    }
+}
+
+
+{ "permissions": { "default": { "any": { "allow": [ "ranks" ], "deny": [] } }, "whatsapp": { "any": { "allow": [ "all" ], "deny": [] }, "ListAvailableCoursesInteractAction": { "allow": [ "ranks" ], "deny": [ "supervisors" ] }, "ListEnrolledCoursesInteractAction": { "allow": [ "ranks" ], "deny": [ "supervisors" ] }, "ListSubscribedNewsInteractAction": { "allow": [ "ranks" ], "deny": [ "supervisors" ] }, "ArcSubscriptionInterviewInteractAction": { "allow": [ "ranks" ], "deny": [ "supervisors" ] }, "ArcOnboardingInterviewInteractAction": { "allow": [ "all" ], "deny": [ "supervisors" ] }, "ArcQrcodeInterviewInteractAction": { "allow": [ "ranks" ], "deny": [ "supervisors" ] }, "LookupShortPassInteractAction": { "allow": [ "ranks" ], "deny": [ "supervisors" ] }, "ArcShortPassInterviewInteractAction": { "allow": [ "ranks" ], "deny": [ "supervisors" ] }, "ArcSupervisorShortPassInterviewInteractAction": { "allow": [ "supervisors" ], "deny": [ "ranks" ] } } }, "session_groups": { "ranks": [ "5926431530" ], "supervisors": [ "59264315300" ] } }
+
+

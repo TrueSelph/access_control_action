@@ -2,7 +2,7 @@ package:
   name: jivas/access_control_action
   author: V75 Inc.
   architype: AccessControlAction
-  version: 0.0.1
+  version: 0.0.2
   meta:
     title: Access Control Action
     description: Allows access control permissions to be defined per action and user (by session_id); maintains a record of session_ids and associated role.
