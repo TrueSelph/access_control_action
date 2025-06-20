@@ -10,7 +10,7 @@ walker add_channel :interact_graph_walker: {
 
     has name:str = "";
     has response:bool = False;
-    
+
     # set up logger
     static has logger:Logger = logging.getLogger(__name__);
 

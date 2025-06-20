@@ -10,7 +10,7 @@ walker add_user :interact_graph_walker: {
 
     has user_id:str = "";
     has response:bool = False;
-    
+
     # set up logger
     static has logger:Logger = logging.getLogger(__name__);
 

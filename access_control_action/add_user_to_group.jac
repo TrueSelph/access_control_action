@@ -11,7 +11,7 @@ walker add_user_to_group :interact_graph_walker: {
     has user_id:str = "";
     has group:str = "";
     has response:bool = False;
-    
+
     # set up logger
     static has logger:Logger = logging.getLogger(__name__);
 

@@ -28,8 +28,8 @@ node AccessControlAction :Action: {
     # allows access control permissions to be defined per channel, action and session_id; maintains perm configs as a record of session_ids and associated role
 
     has exceptions:list = []; # collection of actions which are exempt from permissions
-
     has permissions:dict = {
+        #*
         "default": { # channel
             "any":{ # resource, e.g. action type; 'any' is default
                 "deny":["test"], # can accommodate specific session ids, session group name or 'all'
@@ -56,21 +56,21 @@ node AccessControlAction :Action: {
                 "allow":["all", "any"]
             }
         }
-
+        *#
     };
-
-    has purge_collection:bool = False;
-
+    # contains group name as key and list of session_ids as the value
     has session_groups:dict = {
+        #*
         "test": [
             "5926431530",
             "5926431531",
             "5926431532"
         ]
-    }; # contains group name as key and list of session_ids as the value
+        *#
+    };
 
     can on_register() {
-        self.import_permissions(self.permissions, self.session_groups, self.purge_collection);
+        self.import_permissions(self.permissions, self.session_groups);
     }
 
     can add_session_group(group_name:str, session_ids:list) {
@@ -153,8 +153,13 @@ node AccessControlAction :Action: {
         }
     }
 
-    can import_permissions(permissions:dict={}, session_groups:dict={}, purge_collection:bool=False) -> bool {
+    can import_permissions(permissions:dict={}, session_groups:dict={}, purge_collection:bool=True) -> bool {
         # pruge collection before migration
+
+        if not permissions {
+            return False;
+        }
+
         if(purge_collection){
             self.get_agent().get_memory().purge_collection_memory(self.label);
         }
@@ -270,7 +275,7 @@ node AccessControlAction :Action: {
             if not session_id {
                 session_id = "any";
             }
-            
+
             return (collection spawn _has_access(user_id=session_id, channel=channel, resource=action_label)).access;
         } else {
             return True;
@@ -1020,7 +1025,16 @@ walker _has_access {
     }
 
     can on_collection with Collection entry {
-        visit [-->];
+        # we deny by default
+        self.access = False;
+        # set default values
+        if not self.user_id {
+            self.user_id = "all";
+        }
+        if not self.resource {
+            self.user_id = "any";
+        }
+        visit [-->](`?Channels);
     }
 
     can on_channels with Channels entry {
@@ -1028,54 +1042,25 @@ walker _has_access {
     }
 
     can on_channel with Channel entry {
-        resources = [<--](`?Resource);
         visit [-->](`?Resource)(?name==self.resource) else {
             visit [-->](`?Resource)(?name=="any");
         }
     }
 
     can on_resource with Resource entry {
-        if not self.user_id {
-            self.user_id = "all";
+
+        visit [-:Allow:->](`?User)(?user_id==self.user_id) else {
+            visit [-:Allow:->](`?Group);
         }
-        # allow = [->:Allow:(?enabled==True):->](`?User)(?user_id==self.user_id);
-        # deny = [->:Deny:(?enabled==True):->](`?User)(?user_id==self.user_id);
-        allow = [-:Allow:->](`?User)(?user_id==self.user_id);
-        deny = [-:Deny:->](`?User)(?user_id==self.user_id);
+    }
 
-        # set access to false if deny
-        if deny {
-            self.access = False;
-        }
+    can on_user with User entry {
+        self.access = True;
+    }
 
 
-        # set access to true if allow
-        if allow {
-            self.access = True;
-        }
-
-
-        # check for deny group access for each group
-        deny_group = [-:Deny:->](`?Group);
-        for group in deny_group {
-            deny_group_access = group.has_user(user_id=self.user_id);
-            if deny_group_access {
-                self.access = False;
-                break;
-            }
-        }
-
-
-        # check allow group access for each group
-        allow_group = [-:Allow:->](`?Group);
-        for group in allow_group {
-            allow_group_access = group.has_user(user_id=self.user_id);
-            if allow_group_access {
-                self.access = True;
-                break;
-            }
-        }
-
+    can on_group with Group entry {
+        visit [-->](`User)(?user_id==self.user_id);
     }
 }
 
