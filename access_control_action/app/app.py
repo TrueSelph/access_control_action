@@ -24,9 +24,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
     """
     # add app header controls
     (model_key, module_root) = app_header(agent_id, action_id, info)
-    # add app main controls
-    # app_controls(agent_id, action_id)
-    # app_update_action(agent_id, action_id)
+
     with st.expander("Access Control Configuration", expanded=False):
         # Add main app controls
         app_controls(agent_id, action_id, hidden=["session_groups", "permissions"])
@@ -141,244 +139,243 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             except Exception as e:
                 st.error(f"Import failed: {e}")
 
-    st.markdown(
-        """
-    <style>
-        .slim-row {
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        .slim-row:last-child {
-            border-bottom: none;
-        }
-        .compact-button {
-            padding: 0.2em 0.5em;
-            font-size: 0.9em;
-            height: auto !important;
-        }
-    </style>
-    """,
-        unsafe_allow_html=True,
-    )
-
     with st.expander("Manage Users", False):
-        st.subheader("Add User")
-        user_id = st.text_input("Enter User ID", key=f"{model_key}_input_user_id")
-        if st.button(
-            "Add User", key=f"{model_key}_btn_add_user", disabled=(not agent_id)
-        ):
-            # Call the function to purge
-            if result := call_action_walker_exec(
-                agent_id, module_root, "add_user", {"user_id": user_id}
+        add_tab, users_tab = st.tabs(["Add Users", "Users"])
+
+        # add user tab
+        with add_tab:
+            # Create the text input - let Streamlit manage the state with the key
+            user_id = st.text_input("Enter User ID", key=f"{model_key}_input_user_id")
+
+            if st.button(
+                "Add User", key=f"{model_key}_btn_add_user", disabled=(not agent_id)
             ):
-                st.success("User added successfully")
-            else:
-                st.error("Failed to add user. Ensure that the user ID is correct")
+                if result := call_action_walker_exec(
+                    agent_id, module_root, "add_user", {"user_id": user_id}
+                ):
+                    st.success("User added successfully")
+                else:
+                    st.error("Failed to add user. Ensure that the user ID is correct")
 
-            time.sleep(2)
-            st.rerun()
+                time.sleep(2)
+                st.rerun()
 
-        st.markdown("\n")
-        st.subheader("Users")
+        # users tab
+        with users_tab:
 
-        if result := call_action_walker_exec(agent_id, module_root, "get_users", {}):
-            for user in result:
-                # Create a container for each row with custom class
-                with st.container():
-                    # Add custom class to the container
-                    st.markdown('<div class="slim-row">', unsafe_allow_html=True)
+            st.markdown(
+                """
+            <style>
+                .slim-row {
+                    padding: 0.5rem 0;
+                    border-bottom: 1px solid #e0e0e0;
+                }
+                .slim-row:last-child {
+                    border-bottom: none;
+                }
+                .compact-button {
+                    padding: 0.2em 0.5em;
+                    font-size: 0.9em;
+                    height: auto !important;
+                }
+            </style>
+            """,
+                unsafe_allow_html=True,
+            )
 
-                    cols = st.columns([4, 1])
-                    with cols[0]:
-                        st.markdown(f"**{user['user_id']}**")
-
-                    with cols[1]:
-                        if st.button(
-                            "Delete",
-                            key=f"{model_key}_{user['user_id']}_btn_delete_user",
-                            disabled=(not agent_id),
-                            # Use compact button style
-                            use_container_width=True,
-                        ):
-                            if result := call_action_walker_exec(
-                                agent_id,
-                                module_root,
-                                "delete_user",
-                                {"user_id": user["user_id"]},
-                            ):
-                                st.success(
-                                    f"User {user['user_id']} removed successfully"
-                                )
-                            else:
-                                st.error(f"Failed to remove user '{user['user_id']}'")
-
-                            time.sleep(2)
-                            st.rerun()
-
-                    # Close the div
-                    st.markdown("</div>", unsafe_allow_html=True)
-        else:
-            st.error("Failed to get user.")
-
-    with st.expander("Manage Groups", False):
-        st.subheader("Add Group")
-        new_group = st.text_input("Enter Group", key=f"{model_key}_input_group")
-        if st.button("Add Group", key=f"{model_key}_btn_add_group"):
-            # Call the function to purge
             if result := call_action_walker_exec(
-                agent_id, module_root, "add_group", {"name": new_group}
+                agent_id, module_root, "get_users", {}
             ):
-                st.success("Group added successfully")
-            else:
-                st.error("Failed to add group. Ensure that the group is correct")
+                for user in result:
+                    # Create a container for each row with custom class
+                    with st.container():
+                        # Add custom class to the container
+                        st.markdown('<div class="slim-row">', unsafe_allow_html=True)
 
-            time.sleep(2)
-            st.rerun()
+                        cols = st.columns([4, 1])
+                        with cols[0]:
+                            st.markdown(f"**{user['user_id']}**")
 
-        st.markdown("\n---")
-
-        groups_result = call_action_walker_exec(
-            agent_id, module_root, "get_groups", {"include_users": True}
-        )
-        users = call_action_walker_exec(agent_id, module_root, "get_users", {})
-
-        groups = [group["name"] for group in groups_result]
-        users = [user["user_id"] for user in users]
-        if not groups:
-            st.error("Failed to get groups.")
-
-        if not users:
-            st.error("Failed to get users.")
-
-        st.subheader("Add User to Group")
-
-        user_id = st.selectbox("Select User", users, key=f"{model_key}_select_user")
-        group = st.selectbox("Select Group", groups, key=f"{model_key}_select_group")
-
-        if st.button("Add User to Group", key=f"{model_key}_btn_add_user_to_group"):
-            # Call the function to purge
-            if result := call_action_walker_exec(
-                agent_id,
-                module_root,
-                "add_user_to_group",
-                {"group": group, "user_id": user_id},
-            ):
-                st.success("Group added successfully")
-            else:
-                st.error("Failed to add group. Ensure that the group is correct")
-            time.sleep(2)
-            st.rerun()
-
-        st.markdown("\n---")
-        st.subheader("Groups and Users")
-
-        for item in groups_result:
-            group_name = item.get("name", "Unnamed Group")
-            users = item.get("users", [])
-            if group_name not in ["all", "any"]:
-                st.markdown("---")
-
-                # Group header row
-                group_cols = st.columns([6, 1])
-                with group_cols[0]:
-                    st.markdown(f"### {group_name}")
-                with group_cols[1]:
-                    if st.button(
-                        "Delete Group",
-                        key=f"{model_key}_{group_name}_btn_delete_group",
-                        disabled=(not agent_id),
-                        use_container_width=True,
-                    ):
-                        result = call_action_walker_exec(
-                            agent_id, module_root, "delete_group", {"name": group_name}
-                        )
-                        if result:
-                            st.success(f"Group {group_name} removed successfully")
-                        else:
-                            st.error(f"Failed to remove group '{group_name}'")
-                        time.sleep(2)
-                        st.rerun()
-
-                # Show users under group
-                if users:
-                    for i, user in enumerate(users):
-                        # Alternate background color
-                        bg_color = "#1f1f23" if i % 2 == 0 else "#2a2a2f"
-                        text_color = "#817D7D"
-
-                        user_cols = st.columns([6, 1])
-                        with user_cols[0]:
-                            st.markdown(
-                                f"""
-                                <div style="padding: 10px 14px;
-                                            background-color: {bg_color};
-                                            border-radius: 8px;
-                                            margin-bottom: 6px;
-                                            border: 1px solid #3c3c3c;">
-                                    <strong style="color: {text_color}; font-size: 15px;">{user}</strong>
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
-                            )
-
-                        with user_cols[1]:
+                        with cols[1]:
                             if st.button(
-                                "Remove User",
-                                key=f"del_user_{group_name}_{user}",
+                                "Delete",
+                                key=f"{model_key}_{user['user_id']}_btn_delete_user",
+                                disabled=(not agent_id),
+                                # Use compact button style
                                 use_container_width=True,
-                                help=f"Remove {user} from {group_name}",
                             ):
-                                result = call_action_walker_exec(
+                                if result := call_action_walker_exec(
                                     agent_id,
                                     module_root,
                                     "delete_user",
-                                    {"group": group_name, "user_id": user},
-                                )
-                                st.write(result)
-                                if result:
+                                    {"user_id": user["user_id"]},
+                                ):
                                     st.success(
-                                        f"User '{user}' removed from '{group_name}'"
+                                        f"User {user['user_id']} removed successfully"
                                     )
-                                    # st.experimental_rerun()
-                                    # try:
-                                    #     st.experimental_rerun()
-                                    # except Exception as e:
-                                    #     # st.error(f"Rerun failed: {type(e).__name__}: {str(e)}")
-                                    #     # import traceback
-                                    #     # st.text(traceback.format_exc())
-                                    #     pass
-                                    # from contextlib import suppress
-                                    with suppress(Exception):
-                                        st.experimental_rerun()
                                 else:
                                     st.error(
-                                        f"Failed to remove user '{user}' from '{group_name}'"
+                                        f"Failed to remove user '{user['user_id']}'"
                                     )
 
                                 time.sleep(2)
                                 st.rerun()
+
+                        # Close the div
+                        st.markdown("</div>", unsafe_allow_html=True)
+            else:
+                st.error("Failed to get user.")
+
+    with st.expander("Manage Groups", False):
+        add_tab, add_user_to_group_tab, groups_tab = st.tabs(
+            ["Add Group", "Add User to Group", "Groups"]
+        )
+
+        with add_tab:
+            new_group = st.text_input("Enter Group", key=f"{model_key}_input_group")
+            if st.button("Add Group", key=f"{model_key}_btn_add_group"):
+                # Call the function to purge
+                if result := call_action_walker_exec(
+                    agent_id, module_root, "add_group", {"name": new_group}
+                ):
+                    st.success("Group added successfully")
                 else:
-                    st.info("No users in this group.")
-        st.markdown("\n")
+                    st.error("Failed to add group. Ensure that the group is correct")
 
-    with st.expander("Manage Permissions", True):
-        # Initialize selections
+                time.sleep(2)
+                st.rerun()
 
+        with add_user_to_group_tab:
+            groups_result = call_action_walker_exec(
+                agent_id, module_root, "get_groups", {"include_users": True}
+            )
+            users = call_action_walker_exec(agent_id, module_root, "get_users", {})
+
+            groups = [group["name"] for group in groups_result]
+            users = [user["user_id"] for user in users]
+            if not groups:
+                st.error("Failed to get groups.")
+
+            if not users:
+                st.error("Failed to get users.")
+
+            user_id = st.selectbox("Select User", users, key=f"{model_key}_select_user")
+            group = st.selectbox(
+                "Select Group", groups, key=f"{model_key}_select_group"
+            )
+
+            if st.button("Add User to Group", key=f"{model_key}_btn_add_user_to_group"):
+                # Call the function to purge
+                if result := call_action_walker_exec(
+                    agent_id,
+                    module_root,
+                    "add_user_to_group",
+                    {"group": group, "user_id": user_id},
+                ):
+                    st.success("Group added successfully")
+                else:
+                    st.error("Failed to add group. Ensure that the group is correct")
+                time.sleep(2)
+                st.rerun()
+
+        with groups_tab:
+
+            for item in groups_result:
+                group_name = item.get("name", "Unnamed Group")
+                users = item.get("users", [])
+                if group_name not in ["all", "any"]:
+
+                    # Group header row
+                    group_cols = st.columns([6, 1])
+                    with group_cols[0]:
+                        st.markdown(f"### {group_name}")
+                    with group_cols[1]:
+                        if st.button(
+                            "Delete Group",
+                            key=f"{model_key}_{group_name}_btn_delete_group",
+                            disabled=(not agent_id),
+                            use_container_width=True,
+                        ):
+                            result = call_action_walker_exec(
+                                agent_id,
+                                module_root,
+                                "delete_group",
+                                {"name": group_name},
+                            )
+                            if result:
+                                st.success(f"Group {group_name} removed successfully")
+                            else:
+                                st.error(f"Failed to remove group '{group_name}'")
+                            time.sleep(2)
+                            st.rerun()
+
+                    # Show users under group
+                    if users:
+                        for i, user in enumerate(users):
+                            # Alternate background color
+                            bg_color = "#1f1f23" if i % 2 == 0 else "#2a2a2f"
+                            text_color = "#817D7D"
+
+                            user_cols = st.columns([6, 1])
+                            with user_cols[0]:
+                                st.markdown(
+                                    f"""
+                                    <div style="padding: 10px 14px;
+                                                background-color: {bg_color};
+                                                border-radius: 8px;
+                                                margin-bottom: 6px;
+                                                border: 1px solid #3c3c3c;">
+                                        <strong style="color: {text_color}; font-size: 15px;">{user}</strong>
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True,
+                                )
+
+                            with user_cols[1]:
+                                if st.button(
+                                    "Remove User",
+                                    key=f"del_user_{group_name}_{user}",
+                                    use_container_width=True,
+                                    help=f"Remove {user} from {group_name}",
+                                ):
+                                    result = call_action_walker_exec(
+                                        agent_id,
+                                        module_root,
+                                        "delete_user",
+                                        {"group": group_name, "user_id": user},
+                                    )
+                                    st.write(result)
+                                    if result:
+                                        st.success(
+                                            f"User '{user}' removed from '{group_name}'"
+                                        )
+
+                                        with suppress(Exception):
+                                            st.experimental_rerun()
+                                    else:
+                                        st.error(
+                                            f"Failed to remove user '{user}' from '{group_name}'"
+                                        )
+
+                                    time.sleep(2)
+                                    st.rerun()
+                    else:
+                        st.info("No users in this group.")
+            st.markdown("\n")
+
+    with st.expander("Manage Permissions", expanded=False):
+        st.subheader("Add Permissions")
         # Channel selection
         channels = call_action_walker_exec(agent_id, module_root, "get_channels", {})
         if not channels:
             st.write("Channels not found")
             return
-        channel = st.selectbox("Channels", channels, key=f"{model_key}_select_channels")
 
         # Resource selection
         resources = call_action_walker_exec(agent_id, module_root, "get_resources", {})
         if not resources:
             st.write("Resources not found")
             return
-        resource = st.selectbox(
-            "Resource", resources, key=f"{model_key}_select_resources"
-        )
 
         # group selection
         groups_result = call_action_walker_exec(
@@ -395,11 +392,14 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             st.write("Users not found")
         groups.extend([user["user_id"] for user in users])
 
+        # select inputs
+        channel = st.selectbox("Channels", channels, key=f"{model_key}_select_channels")
+        resource = st.selectbox(
+            "Resource", resources, key=f"{model_key}_select_resources"
+        )
         user_id = st.selectbox(
             "Groups and Users", groups, key=f"{model_key}_select_groups_and_users"
         )
-
-        # allow or deny
         access = st.selectbox(
             "Access", ["allow", "deny"], key=f"{model_key}_select_access"
         )
@@ -407,6 +407,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
         # Submit handler
         if st.button("Add Permission", key=f"{model_key}_btn_add_permission"):
 
+            # check if permission is valid before trying to create permission
             result = call_action_walker_exec(
                 agent_id,
                 module_root,
@@ -445,8 +446,6 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                         if item["name"] in group_dict:
                             deny_group.extend(group_dict[item["name"]])
 
-                # current_access = True if user_id in allow_list_formatted else False
-                # current_access = bool(user_id in allow_list_formatted)
                 current_access = user_id in allow_list_formatted
                 if user_id in deny_group:
                     st.error(
@@ -478,8 +477,8 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                     else:
                         st.error("Failed to update permissions")
 
-                    # time.sleep(2)
-                    # st.rerun()
+                    time.sleep(2)
+                    st.rerun()
             else:
                 access_result = call_action_walker_exec(
                     agent_id,
@@ -488,7 +487,6 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                     {
                         "channel": channel,
                         "resource": resource,
-                        # "allow": True if access == "allow" else False,
                         "allow": access == "allow",
                         "user_id": user_id,
                     },
@@ -503,87 +501,81 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                 st.rerun()
 
     with st.expander("Permissions", True):
-        # Initialize selections
-        # Call the function to purge
+        # Initialize and fetch permissions
         if permissions := call_action_walker_exec(
             agent_id, module_root, "export_permissions", {}
         ):
+
+            # Process permissions data
             formatted_permissions = []
-            permissions = permissions["permissions"]
+            permissions = permissions.get("permissions", {})
 
-            for channel in permissions:
-                for resource in permissions[channel]:
-
-                    allow_list = permissions[channel][resource].get("allow", [])
-                    deny_list = permissions[channel][resource].get("deny", [])
+            for channel, resources in permissions.items():
+                for resource, access in resources.items():
+                    allow_list = access.get("allow", [])
+                    deny_list = access.get("deny", [])
 
                     for user in allow_list:
                         formatted_permissions.append(
                             {
-                                "enabled": True,
+                                "enabled": user.get("enabled", False),
                                 "channel": channel,
                                 "resource": resource,
                                 "permission": "Allow",
-                                "user": user,
+                                "user": user.get("name")
+                                or user.get("user_id", "Unknown"),
+                                "type": "group" if user.get("name") else "user",
                             }
                         )
 
                     for user in deny_list:
                         formatted_permissions.append(
                             {
-                                "enabled": False,
+                                "enabled": user.get("enabled", False),
                                 "channel": channel,
                                 "resource": resource,
                                 "permission": "Deny",
-                                "user": user,
+                                "user": user.get("name")
+                                or user.get("user_id", "Unknown"),
+                                "type": "group" if user.get("name") else "user",
                             }
                         )
 
-            # Initialize session state for tracking changes
-            if "df_permissions" not in st.session_state:
-                st.session_state.df_permissions = pd.DataFrame(formatted_permissions)
-            if "last_changed" not in st.session_state:
-                st.session_state.last_changed = None
+            # Initialize session state with proper column handling
+            # if "df_permissions" not in st.session_state:
+            columns = ["enabled", "channel", "resource", "permission", "user", "type"]
+            # Create empty DataFrame with all columns if no permissions exist
+            st.session_state.df_permissions = pd.DataFrame(
+                formatted_permissions if formatted_permissions else [], columns=columns
+            )
 
-            # Configure column types for better display
-            column_config = {
-                "enabled": st.column_config.CheckboxColumn(
-                    "Enabled",
-                    help="Whether the permission is active",
-                    default=False,
-                ),
-                "channel": st.column_config.TextColumn(
-                    "Channel",
-                    help="Communication channel",
-                    disabled=True,  # Make non-editable
-                ),
-                "resource": st.column_config.TextColumn(
-                    "Resource",
-                    help="Target resource",
-                    disabled=True,  # Make non-editable
-                ),
-                "user": st.column_config.TextColumn(
-                    "User", help="User ID or group", disabled=True  # Make non-editable
-                ),
-                "permission": st.column_config.SelectboxColumn(
-                    "Permission",
-                    help="Access level",
-                    options=["Allow", "Deny"],
-                    required=True,
-                    disabled=True,  # Make non-editable
-                ),
-            }
+            # Ensure all columns exist in session state
+            required_columns = ["enabled", "channel", "resource", "permission", "user"]
+            for col in required_columns:
+                if col not in st.session_state.df_permissions:
+                    st.session_state.df_permissions[col] = (
+                        False if col == "enabled" else ""
+                    )
 
-            # --- FILTERS SECTION ABOVE TABLE ---
+            # Display header
             st.subheader("Permissions")
 
-            # Create filter columns
+            # Create filter columns - safely handle empty states
             cols = st.columns([1, 1, 1])
+
             with cols[0]:
-                channel_filter = st.multiselect(
-                    "Channel:",
-                    options=st.session_state.df_permissions["channel"].unique(),
-                    default=st.session_state.df_permissions["channel"].unique(),
+                # # Safely get resource options
+                resource_options = []
+                if "resource" in st.session_state.df_permissions:
+                    resource_options = (
+                        st.session_state.df_permissions["resource"].unique().tolist()
+                    )
+
+                resource_filter = st.multiselect(
+                    "Resource:",
+                    options=resource_options,
+                    default=[],
+                    disabled=len(resource_options) == 0,
                 )
 
             with cols[1]:
@@ -594,74 +586,129 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                     "Permission:", options=["All", "Allow", "Deny"]
                 )
 
-            # Apply filters
+            # Apply filters safely
             filtered_df = st.session_state.df_permissions.copy()
-            if channel_filter:
-                filtered_df = filtered_df[filtered_df["channel"].isin(channel_filter)]
-            if user_filter:
+
+            if resource_filter and "resource" in filtered_df:
+                filtered_df = filtered_df[filtered_df["resource"].isin(resource_filter)]
+
+            if user_filter and "user" in filtered_df:
                 filtered_df = filtered_df[
-                    filtered_df["user"].str.contains(user_filter, case=False)
+                    filtered_df["user"].str.contains(user_filter, case=False, na=False)
                 ]
-            if permission_filter != "All":
+
+            if permission_filter != "All" and "permission" in filtered_df:
                 filtered_df = filtered_df[
                     filtered_df["permission"] == permission_filter
                 ]
 
-            # --- TABLE SECTION WITH INTERACTIVE CHECKBOXES ---
-            # st.subheader("Permissions Configuration")
+            # Display table header
+            if not filtered_df.empty:
+                header_cols = st.columns([0.54, 0.6, 1.43, 0.9, 0.8, 0.5, 0.01])
+                header_labels = [
+                    "Enabled",
+                    "Channel",
+                    "Resource",
+                    "User/Group",
+                    "Permission",
+                    "Delete",
+                ]
 
-            # Use data editor for interactive checkboxes
-            edited_df = st.data_editor(
-                filtered_df,
-                column_config=column_config,
-                use_container_width=True,
-                hide_index=True,
-                height=700,
-                key="permissions_editor",
-            )
+                for i, label in enumerate(header_labels):
+                    with header_cols[i]:
+                        st.write(f"**{label}**")
 
-            # Detect changes and show modified row
-            if not edited_df.equals(filtered_df):
-                # Find changed rows
-                changed_rows = edited_df[edited_df["enabled"] != filtered_df["enabled"]]
+            if "checkbox_states" not in st.session_state:
+                st.session_state.checkbox_states = {}
 
-                if not changed_rows.empty:
-                    # Update session state with changes
-                    for idx, row in changed_rows.iterrows():
-                        st.session_state.df_permissions.loc[idx, "enabled"] = row[
-                            "enabled"
-                        ]
+            # Create form for each row
+            for idx, row in filtered_df.iterrows():
+                row_key = f"row_{idx}"
+                with st.form(key=row_key):
+                    cols = st.columns([0.5, 0.7, 1.5, 1, 0.8, 0.5])
 
-                    # Store last changed row for display
-                    st.session_state.last_changed = changed_rows.iloc[0].to_dict()
+                    # Enabled checkbox
+                    with cols[0]:
+                        # button_text = "Enable ✅" if row['enabled'] else "Disable ⛔"
+                        button_text = "✅" if row["enabled"] else "⛔"
+                        enable_submitted = st.form_submit_button(
+                            button_text, use_container_width=True
+                        )
 
-                    # Show success message
-                    # st.success("Permissions updated!")
+                    # Display row data with fallbacks
+                    with cols[1]:
+                        st.write(row.get("channel", "N/A"))
+                    with cols[2]:
+                        st.write(row.get("resource", "N/A"))
+                    with cols[3]:
+                        st.write(row.get("user", "Unknown"))
+                    with cols[4]:
+                        st.write(row.get("permission", "N/A"))
 
-                    # Print changed row to console (and display in app)
-                    # st.write("Last changed row:")
-                    # st.json(st.session_state.last_changed)
+                    # Delete button
+                    with cols[5]:
+                        delete_submitted = st.form_submit_button(
+                            "🗑️", use_container_width=True
+                        )
 
-                    # Print to terminal (for actual console printing)
-                    print("Changed row:", st.session_state.last_changed)
-                    # {"enabled":true,"channel":"whatsapp","resource":"ListAvailableCoursesInteractAction","permission":"Deny","user":"test"}
-                    enable_result = st.session_state.last_changed
-                    if call_action_walker_exec(
-                        agent_id,
-                        module_root,
-                        "enable_access",
-                        {
-                            "enabled": enable_result["enabled"],
-                            "channel": enable_result["channel"],
-                            "resource": enable_result["resource"],
-                            "user": enable_result["user"],
-                        },
-                    ):
-                        st.success("Edge updated!")
-                    else:
-                        st.error("Failed to update edge.")
+                    # Submit button for the form
+                    if enable_submitted:
+
+                        if call_action_walker_exec(
+                            agent_id,
+                            module_root,
+                            "enable_access",
+                            {
+                                "enabled": not bool(row.get("enabled")),
+                                "channel": row.get("channel", ""),
+                                "resource": row.get("resource", ""),
+                                "user": row.get("user", ""),
+                            },
+                        ):
+                            st.success("Updated successfully!")
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error("Failed to update permission")
+
+                    # Handle actions
+                    if delete_submitted:
+                        if row.get("type") == "group":
+                            payload = {
+                                "channel": row.get("channel", ""),
+                                "resource": row.get("resource", ""),
+                                "user_id": "",
+                                "group": row.get("user", ""),
+                            }
+                        else:
+                            payload = {
+                                "channel": row.get("channel", ""),
+                                "resource": row.get("resource", ""),
+                                "user_id": row.get("user", ""),
+                                "group": "",
+                            }
+                        if call_action_walker_exec(
+                            agent_id, module_root, "delete_permission", payload
+                        ):
+
+                            st.session_state.df_permissions = (
+                                st.session_state.df_permissions.drop(idx)
+                            )
+                            st.success(
+                                f"Deleted permission for {row.get('user', 'user')}!"
+                            )
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete permission")
 
             # Show record count
             st.caption(
-                f"Showing {len(edited_df)} of {len(st.session_state.df_permissions)} permissions"
+                f"Showing {len(filtered_df)} of {len(st.session_state.df_permissions)} permissions"
             )
+
+            # Handle empty state
+            if st.session_state.df_permissions.empty:
+                st.info("No permissions found")
+            elif filtered_df.empty:
+                st.warning("No permissions match your filters")

@@ -10,6 +10,7 @@ import:jac from jivas.agent.action.interact_graph_walker { interact_graph_walker
 walker get_groups :interact_graph_walker: {
 
     has response:list = [];
+    has group:str = "";
     has include_users:bool = False;
 
     # set up logger
@@ -24,6 +25,6 @@ walker get_groups :interact_graph_walker: {
     }
 
     can on_action with Action entry {
-        self.response = here.get_groups(include_users=self.include_users);
+        self.response = here.get_groups(group=self.group, include_users=self.include_users);
     }
 }

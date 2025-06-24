@@ -32,28 +32,96 @@ node AccessControlAction :Action: {
         #*
         "default": { # channel
             "any":{ # resource, e.g. action type; 'any' is default
-                "deny":["test"], # can accommodate specific session ids, session group name or 'all'
-                "allow":["all", "5926431530"] # can accommodate specific session ids, session group name or 'all'
+                "deny":[
+                    {
+                        "group": "test",
+                        "enabled": True
+                    }
+                ], # can accommodate specific session ids, session group name or 'all'
+                "allow":[
+                    {
+                        "group": "all",
+                        "enabled": True
+                    },
+                    {
+                        "group": "5926431530",
+                        "enabled": True
+                    }
+                ] # can accommodate specific session ids, session group name or 'all'
             },
             "all":{ # resource, e.g. action type; 'any' is default
-                "deny":["99999"], # can accommodate specific session ids, session group name or 'all'
-                "allow":["1111", "666666", "test"] # can accommodate specific session ids, session group name or 'all'
+                "deny":[
+                    {
+                        "user": "99999",
+                        "enabled": True
+                    }
+                ], # can accommodate specific session ids, session group name or 'all'
+                "allow":[
+                    {
+                        "user": "1111",
+                        "enabled": True
+                    },
+                    {
+                        "user": "666666",
+                        "enabled": True
+                    },
+                    {
+                        "group": "test",
+                        "enabled": True
+                    }
+                ] # can accommodate specific session ids, session group name or 'all'
             }
         },
         "whatsapp": {
             "any":{
                 "deny":[],
-                "allow":["all", "5926431530", "test"]
+                "allow": [
+                    {
+                        "group": "all",
+                        "enabled": True
+                    },
+                    {
+                        "user": "5926431530",
+                        "enabled": True
+                    },
+                    {
+                        "group": "test",
+                        "enabled": True
+                    }
+                ]
             },
             "TypesenseRetrievalInteractAction": {
-                "allow":["5926431535", "test"],
-                "deny":["5926431537"]
+                "allow": [
+                    {
+                        "user": "5926431535",
+                        "enabled": True
+                    },
+                    {
+                        "group": "test",
+                        "enabled": True
+                    }
+                ],
+                "deny": [
+                    {
+                        "user": "5926431537",
+                        "enabled": True
+                    }
+                ]
             }
         },
         "any": {
             "any":{
                 "deny":[],
-                "allow":["all", "any"]
+                "allow": [
+                    {
+                        "group": "all",
+                        "enabled": True
+                    },
+                    {
+                        "group": "any",
+                        "enabled": True
+                    }
+                ]
             }
         }
         *#
@@ -94,7 +162,7 @@ node AccessControlAction :Action: {
 
     can in_session_group(session_id:str, group_names:list) {
         # checks if a session_id is in any of the session groups provided in the list
-        groups = self.get_groups(include_users=True);
+        groups = self.get_groups(include_users=True, group=group_names);
         for name in group_names {
             for group in groups {
                 if(session_id in group['users'] and group['name'] == name) {
@@ -176,7 +244,6 @@ node AccessControlAction :Action: {
         for permission_channel in permissions {
             # add channel to collection
             channel = (collection spawn _add_channel(permission_channel)).channel;
-            # self.logger.warning(f"channel: {channel}, permission_channel: {permission_channel}");
 
             for permission_resource in permissions[permission_channel] {
                 if last_channel != permission_channel {
@@ -185,22 +252,22 @@ node AccessControlAction :Action: {
                     channel ++> resource;
                 }
                 # get allow and deny permissions
-                permission_resource_allow = list(set(permissions[permission_channel][permission_resource]["allow"]));
-                permission_resource_deny = list(set(permissions[permission_channel][permission_resource]["deny"]));
+                permission_resource_allow = list(permissions[permission_channel][permission_resource]["allow"]);
+                permission_resource_deny = list(permissions[permission_channel][permission_resource]["deny"]);
 
                 # add allow permissions
                 for item in permission_resource_allow {
-                    if ( bool(re.match(r'^[a-zA-Z_]+$', item)) or item == "any" ) {
+                    if ( "name" in item ) {
                         if last_resource != permission_resource {
                             # add group to collection
-                            group = (collection spawn _add_group(name=item, new_group=True)).group;
-                            resource +:Allow:+> group;
+                            group = (collection spawn _add_group(name=item['name'], new_group=True)).group;
+                            resource +:Allow:enabled=item["enabled"]:+> group;
                         }
-                    }else {
+                    } elif ( "user" in item ) {
                         if last_resource != permission_resource {
                             # add user to collection
-                            user = (collection spawn _add_user(user_id=item, new_user=True)).user;
-                            resource +:Allow:+> user;
+                            user = (collection spawn _add_user(user_id=item["user"], new_user=True)).user;
+                            resource +:Allow:enabled=item["enabled"]:+> user;
                         }
                     }
                 }
@@ -209,17 +276,17 @@ node AccessControlAction :Action: {
                 for item in permission_resource_deny {
                     # check if item in both allow and deny
                     if(item not in permission_resource_allow) {
-                        if ( bool(re.match(r'^[a-zA-Z_]+$', item)) or item == "any" ) {
+                        if ( "group" in item ) {
                             if last_resource != permission_resource {
                                 # add group to collection
-                                group = (collection spawn _add_group(name=item, new_group=True)).group;
-                                resource +:Deny:+> group;
+                                group = (collection spawn _add_group(name=item['group'], new_group=True)).group;
+                                resource +:Deny:enabled=item["enabled"]:+> group;
                             }
-                        }else {
+                        } elif( "user" in item ) {
                             if last_resource != permission_resource {
                                 # add user to collection
-                                user = (collection spawn _add_user(user_id=item, new_user=True)).user;
-                                resource +:Deny:+> user;
+                                user = (collection spawn _add_user(user_id=item["user"], new_user=True)).user;
+                                resource +:Deny:enabled=item["enabled"]:+> user;
                             }
                         }
                     } else {
@@ -237,18 +304,8 @@ node AccessControlAction :Action: {
 
         # add user to group
         for session_group in session_groups {
-            group = (collection spawn _add_group(session_group)).group;
-
             for user in session_groups[session_group] {
-                # check if user is in both allow and deny
-                if(user in permission_resource_allow and user in permission_resource_deny) {
-                    self.logger.error(f"{user} is in both allow and deny");
-                    return False;
-                }else{
-                    # add user to collection group
-                    user = (collection spawn _add_user(user)).user;
-                    group ++> user;
-                }
+                self.add_user_to_group(session_group, user);
             }
         }
         return True;
@@ -256,8 +313,6 @@ node AccessControlAction :Action: {
 
     can export_permissions() -> dict {
         collection = self.get_collection();
-        ss = self.in_session_group("5926431531", ["supervisors"]);
-        self.logger.warning(f"5926431531: {ss}");
         return (collection spawn _export_permissions());
     }
 
@@ -276,7 +331,8 @@ node AccessControlAction :Action: {
                 session_id = "any";
             }
 
-            return (collection spawn _has_access(user_id=session_id, channel=channel, resource=action_label)).access;
+            result = (collection spawn _has_access(user_id=session_id, channel=channel, resource=action_label)).access;
+            return result;
         } else {
             return True;
         }
@@ -322,13 +378,13 @@ node AccessControlAction :Action: {
 
 
             if allow {
-                if ( bool(re.match(r'^[a-zA-Z_]+$', user_id)) or user_id == "any" ) {
+                if ( bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', user_id)) or user_id == "any" ) {
                     group_result = (collection spawn _add_group(name=user_id, parent_node=resource_result.resource.id));
                     # delete existing edges and add new edge
                     resource_result.resource del -:Allow:-> group_result.group;
                     resource_result.resource del -:Deny:-> group_result.group;
                     resource_result.resource +:Allow:+> group_result.group;
-                }else {
+                } elif( bool(re.match(r'^\d+$', user_id)) or user_id == "any" ) {
                     user_result = (collection spawn _add_user(user_id=user_id, parent_node=resource_result.resource.id));
                     # delete existing edges and add new edge
                     resource_result.resource del -:Deny:-> user_result.user;
@@ -336,13 +392,13 @@ node AccessControlAction :Action: {
                     resource_result.resource +:Allow:+> user_result.user;
                 }
             } else {
-                if ( bool(re.match(r'^[a-zA-Z_]+$', user_id)) or user_id == "any" ) {
+                if ( bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', user_id)) or user_id == "any" ) {
                     group_result = (collection spawn _add_group(name=user_id, parent_node=resource_result.resource.id));
                     # delete existing edges and add new edge
                     resource_result.resource del -:Allow:-> group_result.group;
                     resource_result.resource del -:Deny:-> group_result.group;
                     resource_result.resource +:Deny:+> group_result.group;
-                }else {
+                } elif( bool(re.match(r'^\d+$', user_id)) or user_id == "any" ) {
                     user_result = (collection spawn _add_user(user_id=user_id, parent_node=resource_result.resource.id));
                     # delete existing edges and add new edge
                     resource_result.resource del -:Allow:-> user_result.user;
@@ -408,6 +464,11 @@ node AccessControlAction :Action: {
         return (collection spawn _delete_user(user_id=user_id, group=group)).deleted;
     }
 
+    can delete_permission(channel:str="", resource:str="", group:str="", user_id:str="") -> bool {
+        collection = self.get_collection();
+        return (collection spawn _delete_permission(channel=channel, resource=resource, group=group, user_id=user_id)).deleted;
+    }
+
     can get_interact_actions -> list[str] {
         return (self.get_agent() spawn _get_interact_actions()).actions;
     }
@@ -423,9 +484,9 @@ node AccessControlAction :Action: {
         return (collection spawn _get_resources()).resources;
     }
 
-    can get_groups(include_users:bool=False) -> list {
+    can get_groups(group:str="", include_users:bool=False) -> list {
         collection = self.get_collection();
-        return (collection spawn _get_groups(include_users=include_users)).groups;
+        return (collection spawn _get_groups(group=group, include_users=include_users)).groups;
     }
 
     can get_users(out_of_groups:bool=False) -> list[str] {
@@ -778,22 +839,7 @@ walker _delete_user {
 
     can on_collection with Collection entry {
         self.collection = here;
-        if self.group and not self.edge_deleted {
-            visit [-->](`?Groups);
-        }else{
-            visit [-->](`?Users);
-        }
-    }
-
-    can on_groups with Groups entry {
-        visit [-->](`?Group)(?name == self.group);
-    }
-
-    can on_group with Group entry {
-        self.edge_deleted = True;
-        here del --> [-->](`?User)(?user_id == self.user_id);
-        self.deleted = True;
-        visit self.collection;
+        visit [-->](`?Users);
     }
 
     can on_users with Users entry {
@@ -803,9 +849,11 @@ walker _delete_user {
     can on_user with User entry {
         parent_nodes = [<--];
         if self.group {
-            if(len(parent_nodes) <= 1) {
+            if(len(parent_nodes) <= 2) {
                 self.deleted = True;
                 Jac.destroy(here);
+            }else{
+                here del <-- [<--](`?Group)(?name == self.group);
             }
         }else{
             self.deleted = True;
@@ -815,7 +863,52 @@ walker _delete_user {
     }
 }
 
-# get get_permissions
+walker _delete_permission {
+    has channel:str = "";
+    has resource:str = "";
+    has group:str = "";
+    has user_id:str = "";
+    has deleted:list = [];
+
+    can on_collection with Collection entry {
+        visit [-->](`?Channels);
+    }
+
+    can on_channels with Channels entry {
+        visit [-->](`?Channel)(?name == self.channel);
+    }
+
+    can on_channel with Channel entry {
+        visit [-->](`?Resource)(?name == self.resource);
+    }
+
+    can on_resource with Resource entry {
+
+        parent_edges = [<--];
+        children_edges = [<--];
+        if(len(parent_edges) <= 2 and len(children_edges) <= 1) {
+            here del <-- [<--](`?Channel)(?name == self.channel);
+            self.deleted.append(here);
+
+        }
+
+        visit [-->](`?Group)(?name == self.group) else {
+            visit [-->](`?User)(?user_id == self.user_id);
+        }
+    }
+
+    can on_group with Group entry {
+        here del <-- [<--](`?Resource)(?name == self.resource);
+        self.deleted.append(here);
+    }
+
+    can on_user with User entry {
+        here del <-- [<--](`?Resource)(?name == self.resource);
+        self.deleted.append(here);
+    }
+
+}
+
 walker _get_channels {
     has channels:list = [];
 
@@ -850,6 +943,7 @@ walker _get_resources {
 
 walker _get_groups {
     has groups:list = [];
+    has group:str = "";
     has include_users:bool = False;
 
     can on_collection with Collection entry {
@@ -857,7 +951,11 @@ walker _get_groups {
     }
 
     can on_groups with Groups entry {
-        visit [-->](`?Group);
+        if self.group {
+            visit [-->](`?Group)(?name == self.group);
+        }else{
+            visit [-->](`?Group);
+        }
     }
 
     can on_group with Group entry {
@@ -945,7 +1043,6 @@ walker _get_access {
 }
 
 
-# import permssion to access control
 walker _export_permissions {
     has permissions:dict = {};
     has session_groups:dict = {};
@@ -967,24 +1064,46 @@ walker _export_permissions {
         allow_list = [];
         deny_list = [];
 
-        allow_nodes = [-:Allow:->];
-        deny_nodes = [-:Deny:->];
+        allow_nodes_disabled = [-:Allow:enabled==False:->];
+        allow_nodes_enabled = [-:Allow:enabled==True:->];
+        deny_nodes_enabled = [-:Deny:enabled==True:->];
+        deny_nodes_disabled = [-:Deny:enabled==False:->];
 
-        for allow_node in allow_nodes {
+
+        for allow_node in allow_nodes_enabled {
             if allow_node.get_type() in ["Group", "AnyGroup"] {
-                allow_list.append(allow_node.name);
+                allow_list.append({"name": allow_node.name, "enabled": True});
             }else{
-                allow_list.append(allow_node.user_id);
+                allow_list.append({"user": allow_node.user_id, "enabled": True});
             }
         }
 
-        for deny_node in deny_nodes {
-            if deny_node.get_type() in ["Group", "AnyGroup"] {
-                deny_list.append(deny_node.name);
+        for allow_node in allow_nodes_disabled {
+            if allow_node.get_type() in ["Group", "AnyGroup"] {
+                allow_list.append({"name": allow_node.name, "enabled": False});
             }else{
-                deny_list.append(deny_node.user_id);
+                allow_list.append({"user": allow_node.user_id, "enabled": False});
             }
         }
+
+
+        for deny_node in deny_nodes_enabled {
+            if deny_node.get_type() in ["Group", "AnyGroup"] {
+                deny_list.append({"name": deny_node.name, "enabled": True});
+            }else{
+                deny_list.append({"user": deny_node.user_id, "enabled": True});
+            }
+        }
+
+
+        for deny_node in deny_nodes_disabled {
+            if deny_node.get_type() in ["Group", "AnyGroup"] {
+                deny_list.append({"name": deny_node.name, "enabled": False});
+            }else{
+                deny_list.append({"user": deny_node.user_id, "enabled": False});
+            }
+        }
+
 
         if channel not in self.permissions.keys() {
             self.permissions[channel] = {here.name: {"allow": allow_list, "deny": deny_list}};
@@ -1013,12 +1132,13 @@ walker _export_permissions {
     }
 }
 
-# check access
+
 walker _has_access {
     has channel:str = "default";
     has resource:str = "any";
     has user_id:str = "all";
     has access:bool = False;
+    has denied_groups:list = [];
 
     obj __specs__ {
         static has private:bool = True;
@@ -1042,15 +1162,29 @@ walker _has_access {
     }
 
     can on_channel with Channel entry {
+        # set another walker on the explicit deny traversal check
+        result = (here spawn _has_explicit_deny_access(
+            resource = self.resource,
+            user_id = self.user_id
+        ));
+        self.denied_groups = result.groups;
+
+        if result.denied {
+            self.access = False;
+            if not self.denied_groups {
+                disengage;
+            }
+        }
+
+
         visit [-->](`?Resource)(?name==self.resource) else {
             visit [-->](`?Resource)(?name=="any");
         }
     }
 
     can on_resource with Resource entry {
-
-        visit [-:Allow:->](`?User)(?user_id==self.user_id) else {
-            visit [-:Allow:->](`?Group);
+        visit [-:Allow:enabled==True:->](`?User)(?user_id==self.user_id) else {
+            visit [-:Allow:enabled==True:->](`?Group);
         }
     }
 
@@ -1060,11 +1194,56 @@ walker _has_access {
 
 
     can on_group with Group entry {
-        visit [-->](`User)(?user_id==self.user_id);
+        visit [-->](`?User)(?user_id==self.user_id) else {
+            if isinstance(here, AnyGroup) and not self.denied_groups {
+                self.access = True;
+            }
+        }
+    }
+
+}
+
+
+walker _has_explicit_deny_access {
+
+    has resource:str = "any";
+    has user_id:str = "all";
+    has denied:bool = False;
+    has groups:list = [];
+
+    obj __specs__ {
+        static has private:bool = True;
+    }
+
+    can on_channel with Channel entry {
+        visit [-->](`?Resource)(?name==self.resource) else {
+            visit [-->](`?Resource)(?name=="any");
+        }
+    }
+
+    can on_resource with Resource entry {
+        visit [-:Deny:enabled==True:->](`?User)(?user_id==self.user_id) else {
+            visit [-:Deny:enabled==True:->](`?Group);
+        }
+    }
+
+    can on_user with User entry {
+        self.denied = True;
+    }
+
+    can on_group with Group entry {
+
+        if [-->](`?User)(?user_id==self.user_id){
+            self.groups.append(here.get_type());
+            visit [-->](`?User)(?user_id==self.user_id);
+        } elif (isinstance(here, AnyGroup)) {
+            self.groups.append(here.get_type());
+            self.denied = True;
+        }
     }
 }
 
-# get interact actions
+
 walker _get_interact_actions {
 
     has actions:list[str] = ["all", "any"];
@@ -1103,19 +1282,15 @@ walker _enable_access {
     }
 
     can on_collection with Collection entry {
-        print("collection");
         visit [-->](`?Channels);
     }
     can on_channels with Channels entry {
-        print("channels");
         visit [-->](`?Channel)(?name==self.channel);
     }
     can on_channel with Channel entry {
-        print("channel");
         visit [-->](`?Resource)(?name==self.resource);
     }
     can on_resource with Resource entry {
-        print("resource");
         allow_user_edges = [-:Allow:->](`?User)(?user_id==self.user);
         deny_user_edges = [-:Deny:->](`?User)(?user_id==self.user);
         allow_group_edges = [-:Allow:->](`?Group)(?name==self.user);
@@ -1123,35 +1298,25 @@ walker _enable_access {
 
 
         if allow_user_edges {
-            print(allow_user_edges[0]);
             here del --> [-->](`?User)(?user_id == allow_user_edges[0].user_id);
-            here +:Allow(enabled=self.enabled):+> allow_user_edges[0];
-                # inception +>:Similar(similarity_score=0.85):+> interstellar;
+            here +:Allow:enabled=self.enabled:+> allow_user_edges[0];
         }
 
         if deny_user_edges {
-            print(deny_user_edges[0]);
             here del --> [-->](`?User)(?user_id == deny_user_edges[0].user_id);
-            here +:Deny:+> deny_user_edges[0];
-            # here +Deny(enabled=self.enabled)+> deny_user_edges[0];
+            here +:Deny:enabled=self.enabled:+> deny_user_edges[0];
         }
 
-        # if allow_group_edges {
-        #     print(allow_group_edges[0]);
-        #     here del --> [-->](`?Group)(?name == allow_group_edges[0].name);
-        #     here +Allow(enabled=self.enabled)+> allow_group_edges[0];
-        # }
+        if allow_group_edges {
+            here del --> [-->](`?Group)(?name == allow_group_edges[0].name);
+            here +:Allow:enabled=self.enabled:+> allow_group_edges[0];
+        }
 
-        # if deny_group_edges {
-        #     print(deny_group_edges[0]);
-        #     here del --> [-->](`?Group)(?name == deny_group_edges[0].name);
-        #     here +Deny(enabled=self.enabled)+> deny_group_edges[0];
-        # }
+        if deny_group_edges {
+            here del --> [-->](`?Group)(?name == deny_group_edges[0].name);
+            here +:Deny:enabled=self.enabled:+> deny_group_edges[0];
+        }
 
         self.result = True;
     }
 }
-
-
-# _enable_access
-

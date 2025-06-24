@@ -8,9 +8,11 @@ import:jac from jivas.agent.action.interact_graph_walker { interact_graph_walker
 
 walker delete_permission :interact_graph_walker: {
 
-    has item:str = "";
-    has value:str = "";
+
     has channel:str = "";
+    has resource:str = "";
+    has group:str = "";
+    has user_id:str = "";
     has response:bool = False;
 
     # set up logger
@@ -25,15 +27,7 @@ walker delete_permission :interact_graph_walker: {
     }
 
     can on_action with Action entry {
-        if(item == "user") {
-            self.response = here.delete_user(user_id=self.value);
-        }elif(item == "group") {
-            self.response = here.delete_group(name=self.value);
-        }elif(item == "channel") {
-            self.response = here.delete_channel(name=self.value);
-        }elif(item == "resource") {
-            self.response = here.delete_resource(channel=self.channel, resource=self.value);
-        }
+        self.response = here.delete_permission(channel=self.channel, resource=self.resource, group=self.group, user_id=self.user_id);
     }
 
 }
