@@ -139,7 +139,7 @@ node AccessControlAction :Action: {
     };
 
     can on_register() {
-        # import permissions to collection 
+        # import permissions to collection
         self.import_permissions(self.permissions, self.session_groups);
     }
 
@@ -224,20 +224,20 @@ node AccessControlAction :Action: {
                 message = f"permissions is not a dict or is empty {type(permissions)}";
                 return { "status": False, "severity": "error", "message": message };
             }
-            
+
             for channel in permissions {
                 resources = permissions[channel];
                 if (type(resources) != dict) {
                     message = f"permissions resources for channel {channel} is not a dict";
                     return {"status": False, "severity": "error", "message": message };
                 }
-                
+
                 for (resource, access_dict) in resources.items() {
                     if (type(access_dict) != dict) {
                         message = f"permissions access dict for resource {resource} is not a dict";
                         return { "status": False, "severity": "error", "message": message };
                     }
-                    
+
                     if ("allow" not in access_dict or "deny" not in access_dict) {
                         message = f"permissions access dict for resource {resource} does not contain allow or deny";
                         return { "status": False, "severity": "error", "message": message };
@@ -245,12 +245,12 @@ node AccessControlAction :Action: {
 
                     allow_list = access_dict["allow"];
                     deny_list = access_dict["deny"];
-                    
+
                     if (not isinstance(allow_list, list) or not isinstance(deny_list, list)) {
                         message = f"permissions allow or deny list for resource {resource} is not a list.";
                         return { "status": False, "severity": "error", "message": message };
                     }
-                    
+
                     for item in allow_list {
                         for key in item.keys() {
                             if (key not in ["enabled", "user", "group"]) {
@@ -268,7 +268,7 @@ node AccessControlAction :Action: {
                             }
                         }
                     }
-                    
+
                     for item in deny_list {
                         for key in item.keys() {
                             if (key not in ["enabled", "user", "group"]) {
