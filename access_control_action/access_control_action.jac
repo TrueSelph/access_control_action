@@ -1,5 +1,6 @@
 import:py re;
 import:py traceback;
+import:py from typing { Union }
 import:jac from jivas.agent.core.agent { Agent }
 import:jac from jivas.agent.action.action { Action }
 import:jac from jivas.agent.action.actions { Actions }
@@ -138,7 +139,46 @@ node AccessControlAction :Action: {
     };
 
     can on_register() {
+        # import permissions to collection 
         self.import_permissions(self.permissions, self.session_groups);
+    }
+
+    can convert_permissions(permissions:dict) -> dict {
+        new_permissions = {};
+        USER_PATTERN = r'^(\d{10,15}|[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)$';
+        GROUP_PATTERN = r'^[a-zA-Z_][a-zA-Z0-9_]*(_[a-zA-Z0-9_]+)*$';
+
+        for (permission_type, resources) in permissions.items() {
+            new_permissions[permission_type] = {};
+            for (resource, access_dict) in resources.items() {
+                new_access = {
+                    "allow": [],
+                    "deny": []
+                };
+                for (access_type, items) in access_dict.items() {
+                    for item in items {
+                        if (type(item) == str) {
+                            if bool(re.match(GROUP_PATTERN, item)) {
+                                new_access[access_type].append({
+                                    "group": item,
+                                    "enabled": True
+                                });
+                            } elif(bool(re.match(USER_PATTERN, item))) {
+                                new_access[access_type].append({
+                                    "user": item,
+                                    "enabled": True
+                                });
+                            }
+                        } else {
+                            new_access[access_type].append(item);
+                        }
+                    }
+                }
+                new_permissions[permission_type][resource] = new_access;
+            }
+        }
+
+        return new_permissions;
     }
 
     can add_session_group(group_name:str, session_ids:list) {
@@ -174,50 +214,83 @@ node AccessControlAction :Action: {
         return False;
     }
 
-    can healthcheck() -> bool {
+    can healthcheck() -> Union[dict, bool] {
         try {
-            # Check if 'permissions' is a dict and has at least one key
-            if (type(self.permissions) == dict && len(self.permissions.keys()) > 0) {
-                # Define allowed and required keys
-                allowed_channels = ["default", "whatsapp", "facebook"];
-                required_channels = ["deny", "allow"];
+            permissions = self.export_permissions().permissions;
+            USER_PATTERN = r'^(\d{10,15}|[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)$';
+            GROUP_PATTERN = r'^[a-zA-Z_][a-zA-Z0-9_]*(_[a-zA-Z0-9_]+)*$';
 
-                # Iterate over each channel in the 'permissions'
-                for channel in self.permissions.keys() {
-                    if (channel in allowed_channels) {
-                        if ("any" in self.permissions[channel]) {
-                            # Iterate over each access type in the channel permissions
-                            for access in self.permissions[channel] {
-                                # Get the resource value for this access
-                                resource_value = self.permissions[channel][access];
+            if (type(permissions) != dict or permissions == {}) {
+                message = f"permissions is not a dict or is empty {type(permissions)}";
+                return { "status": False, "severity": "error", "message": message };
+            }
+            
+            for channel in permissions {
+                resources = permissions[channel];
+                if (type(resources) != dict) {
+                    message = f"permissions resources for channel {channel} is not a dict";
+                    return {"status": False, "severity": "error", "message": message };
+                }
+                
+                for (resource, access_dict) in resources.items() {
+                    if (type(access_dict) != dict) {
+                        message = f"permissions access dict for resource {resource} is not a dict";
+                        return { "status": False, "severity": "error", "message": message };
+                    }
+                    
+                    if ("allow" not in access_dict or "deny" not in access_dict) {
+                        message = f"permissions access dict for resource {resource} does not contain allow or deny";
+                        return { "status": False, "severity": "error", "message": message };
+                    }
 
-                                if (type(resource_value) == dict) {
-                                    # Check each required access exists
-                                    for required_channel in required_channels {
-                                        if (required_channel not in resource_value) {
-                                            return False;  # Missing required access
-                                        }
-                                    }
-                                }
-                                else {
-                                    return False;  # Resource value is not a dict
-                                }
+                    allow_list = access_dict["allow"];
+                    deny_list = access_dict["deny"];
+                    
+                    if (not isinstance(allow_list, list) or not isinstance(deny_list, list)) {
+                        message = f"permissions allow or deny list for resource {resource} is not a list.";
+                        return { "status": False, "severity": "error", "message": message };
+                    }
+                    
+                    for item in allow_list {
+                        for key in item.keys() {
+                            if (key not in ["enabled", "user", "group"]) {
+                                message = f"permissions allow list for resource {resource} contains invalid key {key}";
+                                return { "status": False, "severity": "error", "message": message };
+                            }elif(key == "enabled" and type(item[key]) != bool) {
+                                message = f"permissions allow list for resource {resource} enabled key is not a bool";
+                                return { "status": False, "severity": "error", "message": message };
+                            }elif(key == "user" and not bool(re.match(USER_PATTERN, item[key]))) {
+                                message = f"permissions allow list for resource {resource} have invalid user {item[key]}";
+                                return { "status": False, "severity": "error", "message": message };
+                            }elif(key == "group" and not bool(re.match(GROUP_PATTERN, item[key]))) {
+                                message = f"permissions allow list for resource {resource} have invalid group {item[key]}";
+                                return { "status": False, "severity": "error", "message": message };
                             }
                         }
-                        else {
-                            return False;  # 'any' key missing in channel
+                    }
+                    
+                    for item in deny_list {
+                        for key in item.keys() {
+                            if (key not in ["enabled", "user", "group"]) {
+                                message = f"permissions deny list for resource {resource} contains invalid key {key}";
+                                return { "status": False, "severity": "error", "message": message };
+                            }elif(key == "enabled" and type(item[key]) != bool) {
+                                message = f"permissions deny list for resource {resource} enabled key is not a bool";
+                                return { "status": False, "severity": "error", "message": message };
+                            }elif(key == "user" and not bool(re.match(USER_PATTERN, item[key]))) {
+                                message = f"permissions deny list for resource {resource} have invalid user {item[key]}";
+                                return { "status": False, "severity": "error", "message": message };
+                            }elif(key == "group" and not bool(re.match(GROUP_PATTERN, item[key]))) {
+                                message = f"permissions deny list for resource {resource} have invalid group {item[key]}";
+                                return { "status": False, "severity": "error", "message": message };
+                            }
                         }
                     }
-                    else {
-                        return False;  # Channel not in allowed_channels
-                    }
                 }
-                return True;  # All checks passed
             }
-            return False;  # 'permissions' is not a dict or is empty
+            return True;
         } except Exception as e {
-            self.logger.error(f"An exception occurred in {self.label}:\n{traceback.format_exc()}\n");
-            return False;
+            return { "status": False, "severity": "error", "message": f"An error occurred: {e}" };
         }
     }
 
@@ -227,6 +300,9 @@ node AccessControlAction :Action: {
         if not permissions {
             return False;
         }
+        # convert permissions to new format
+        permissions = self.convert_permissions(permissions);
+        self.permissions = permissions;
 
         if(purge_collection){
             self.get_agent().get_memory().purge_collection_memory(self.label);
