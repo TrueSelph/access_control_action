@@ -137,10 +137,11 @@ node AccessControlAction :Action: {
         ]
         *#
     };
+    has purge_collection:bool = True;
 
     can on_register() {
         # import permissions to collection
-        self.import_permissions(self.permissions, self.session_groups);
+        self.import_permissions(self.permissions, self.session_groups, self.purge_collection);
     }
 
     can convert_permissions(permissions:dict) -> dict {
@@ -216,81 +217,63 @@ node AccessControlAction :Action: {
 
     can healthcheck() -> Union[dict, bool] {
         try {
-            permissions = self.export_permissions().permissions;
             USER_PATTERN = r'^(\d{10,15}|[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)$';
             GROUP_PATTERN = r'^[a-zA-Z_][a-zA-Z0-9_]*(_[a-zA-Z0-9_]+)*$';
 
-            if (type(permissions) != dict or permissions == {}) {
+            if (not isinstance(permissions, dict) or permissions == {}) {
                 message = f"permissions is not a dict or is empty {type(permissions)}";
-                return { "status": False, "severity": "error", "message": message };
+                return { "result": False, "message": message };
             }
 
             for channel in permissions {
                 resources = permissions[channel];
-                if (type(resources) != dict) {
+                if (not isinstance(resources, dict)) {
                     message = f"permissions resources for channel {channel} is not a dict";
-                    return {"status": False, "severity": "error", "message": message };
+                    return { "result": False, "message": message };
                 }
 
                 for (resource, access_dict) in resources.items() {
-                    if (type(access_dict) != dict) {
+
+                    if (not isinstance(access_dict, dict)) {
                         message = f"permissions access dict for resource {resource} is not a dict";
-                        return { "status": False, "severity": "error", "message": message };
+                        return { "result": False, "message": message };
                     }
 
-                    if ("allow" not in access_dict or "deny" not in access_dict) {
-                        message = f"permissions access dict for resource {resource} does not contain allow or deny";
-                        return { "status": False, "severity": "error", "message": message };
-                    }
+                    for access_type in access_dict {
+                        if (access_type not in ["allow", "deny"]) {
+                            message = f"permissions access dict for resource {resource} contains invalid access type {access_type}";
+                            return { "status": False, "severity": "error", "message": message };
+                        }
 
-                    allow_list = access_dict["allow"];
-                    deny_list = access_dict["deny"];
+                        if (not isinstance(access_dict[access_type], list)) {
+                            message = f"permissions access dict for resource {resource} {access_type} is not a list";
+                            return { "status": False, "severity": "error", "message": message };
+                        }
 
-                    if (not isinstance(allow_list, list) or not isinstance(deny_list, list)) {
-                        message = f"permissions allow or deny list for resource {resource} is not a list.";
-                        return { "status": False, "severity": "error", "message": message };
-                    }
-
-                    for item in allow_list {
-                        for key in item.keys() {
-                            if (key not in ["enabled", "user", "group"]) {
-                                message = f"permissions allow list for resource {resource} contains invalid key {key}";
-                                return { "status": False, "severity": "error", "message": message };
-                            }elif(key == "enabled" and type(item[key]) != bool) {
-                                message = f"permissions allow list for resource {resource} enabled key is not a bool";
-                                return { "status": False, "severity": "error", "message": message };
-                            }elif(key == "user" and not bool(re.match(USER_PATTERN, item[key]))) {
-                                message = f"permissions allow list for resource {resource} have invalid user {item[key]}";
-                                return { "status": False, "severity": "error", "message": message };
-                            }elif(key == "group" and not bool(re.match(GROUP_PATTERN, item[key]))) {
-                                message = f"permissions allow list for resource {resource} have invalid group {item[key]}";
-                                return { "status": False, "severity": "error", "message": message };
+                        for item in access_dict[access_type] {
+                            for key in item.keys() {
+                                if (key not in ["enabled", "user", "group"]) {
+                                    message = f"permissions {access_type} list for resource {resource} contains invalid key {key}";
+                                    return { "status": False, "severity": "error", "message": message };
+                                }elif(key == "enabled" and not isinstance(item[key], bool)) {
+                                    message = f"permissions {access_type} list for resource {resource} enabled key is not a bool";
+                                    return { "status": False, "severity": "error", "message": message };
+                                }elif(key == "user" and not bool(re.match(USER_PATTERN, item[key]))) {
+                                    message = f"permissions {access_type} list for resource {resource} have invalid user {item[key]}";
+                                    return { "status": False, "severity": "error", "message": message };
+                                }elif(key == "group" and not bool(re.match(GROUP_PATTERN, item[key]))) {
+                                    message = f"permissions {access_type} list for resource {resource} have invalid group {item[key]}";
+                                    return { "status": False, "severity": "error", "message": message };
+                                }
                             }
                         }
                     }
 
-                    for item in deny_list {
-                        for key in item.keys() {
-                            if (key not in ["enabled", "user", "group"]) {
-                                message = f"permissions deny list for resource {resource} contains invalid key {key}";
-                                return { "status": False, "severity": "error", "message": message };
-                            }elif(key == "enabled" and type(item[key]) != bool) {
-                                message = f"permissions deny list for resource {resource} enabled key is not a bool";
-                                return { "status": False, "severity": "error", "message": message };
-                            }elif(key == "user" and not bool(re.match(USER_PATTERN, item[key]))) {
-                                message = f"permissions deny list for resource {resource} have invalid user {item[key]}";
-                                return { "status": False, "severity": "error", "message": message };
-                            }elif(key == "group" and not bool(re.match(GROUP_PATTERN, item[key]))) {
-                                message = f"permissions deny list for resource {resource} have invalid group {item[key]}";
-                                return { "status": False, "severity": "error", "message": message };
-                            }
-                        }
-                    }
                 }
             }
             return True;
         } except Exception as e {
-            return { "status": False, "severity": "error", "message": f"An error occurred: {e}" };
+            return { "result": False, "message": f"An error occurred: {e}" };
         }
     }
 
@@ -333,10 +316,10 @@ node AccessControlAction :Action: {
 
                 # add allow permissions
                 for item in permission_resource_allow {
-                    if ( "name" in item ) {
+                    if ( "group" in item ) {
                         if last_resource != permission_resource {
                             # add group to collection
-                            group = (collection spawn _add_group(name=item['name'], new_group=True)).group;
+                            group = (collection spawn _add_group(name=item['group'], new_group=True)).group;
                             resource +:Allow:enabled=item["enabled"]:+> group;
                         }
                     } elif ( "user" in item ) {
@@ -1148,7 +1131,7 @@ walker _export_permissions {
 
         for allow_node in allow_nodes_enabled {
             if allow_node.get_type() in ["Group", "AnyGroup"] {
-                allow_list.append({"name": allow_node.name, "enabled": True});
+                allow_list.append({"group": allow_node.name, "enabled": True});
             }else{
                 allow_list.append({"user": allow_node.user_id, "enabled": True});
             }
@@ -1156,7 +1139,7 @@ walker _export_permissions {
 
         for allow_node in allow_nodes_disabled {
             if allow_node.get_type() in ["Group", "AnyGroup"] {
-                allow_list.append({"name": allow_node.name, "enabled": False});
+                allow_list.append({"group": allow_node.name, "enabled": False});
             }else{
                 allow_list.append({"user": allow_node.user_id, "enabled": False});
             }
@@ -1165,7 +1148,7 @@ walker _export_permissions {
 
         for deny_node in deny_nodes_enabled {
             if deny_node.get_type() in ["Group", "AnyGroup"] {
-                deny_list.append({"name": deny_node.name, "enabled": True});
+                deny_list.append({"group": deny_node.name, "enabled": True});
             }else{
                 deny_list.append({"user": deny_node.user_id, "enabled": True});
             }
@@ -1174,7 +1157,7 @@ walker _export_permissions {
 
         for deny_node in deny_nodes_disabled {
             if deny_node.get_type() in ["Group", "AnyGroup"] {
-                deny_list.append({"name": deny_node.name, "enabled": False});
+                deny_list.append({"group": deny_node.name, "enabled": False});
             }else{
                 deny_list.append({"user": deny_node.user_id, "enabled": False});
             }
