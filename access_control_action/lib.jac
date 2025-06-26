@@ -1,1 +1,18 @@
 include:jac access_control_action;
+include:jac import_permissions;
+include:jac export_permissions;
+include:jac add_permission;
+include:jac delete_permission;
+include:jac get_resources;
+include:jac get_channels;
+include:jac get_groups;
+include:jac get_access;
+include:jac get_users;
+include:jac add_group;
+include:jac add_user;
+include:jac delete_group;
+include:jac delete_user;
+include:jac add_channel;
+include:jac add_user_to_group;
+include:jac enable_access;
+
