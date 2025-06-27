@@ -11,7 +11,8 @@ walker add_permission :interact_graph_walker: {
     has channel:str = "";
     has resource:str = "";
     has allow:bool = False;
-    has user_id:str = "";
+    has entity:str = "";
+    has is_group:bool = False;
     has response:bool = False;
 
     # set up logger
@@ -26,7 +27,7 @@ walker add_permission :interact_graph_walker: {
     }
 
     can on_action with Action entry {
-        self.response = here.add_permission(channel=self.channel, resource=self.resource, allow=self.allow, user_id=self.user_id);
+        self.response = here.add_permission(channel=self.channel, resource=self.resource, allow=self.allow, entity=self.entity, is_group=self.is_group);
     }
 
 }

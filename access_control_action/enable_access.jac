@@ -11,6 +11,7 @@ walker enable_access :interact_graph_walker: {
 
     has response:dict = {};
     has user:str = "";
+    has group:str = "";
     has channel:str = "";
     has resource:str = "";
     has enabled:bool = False;
@@ -27,6 +28,6 @@ walker enable_access :interact_graph_walker: {
     }
 
     can on_action with Action entry {
-        self.response = here.enable_access(user=self.user, channel=self.channel, resource=self.resource, enabled=self.enabled);
+        self.response = here.enable_access(user=self.user, group=self.group, channel=self.channel, resource=self.resource, enabled=self.enabled);
     }
 }

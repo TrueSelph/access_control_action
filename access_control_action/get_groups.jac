@@ -9,7 +9,7 @@ import:jac from jivas.agent.action.interact_graph_walker { interact_graph_walker
 
 walker get_groups :interact_graph_walker: {
 
-    has response:list = [];
+    has response:dict = {};
     has group:str = "";
     has include_users:bool = False;
 

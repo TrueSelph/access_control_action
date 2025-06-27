@@ -13,6 +13,6 @@ include:jac add_user;
 include:jac delete_group;
 include:jac delete_user;
 include:jac add_channel;
-include:jac add_user_to_group;
+include:jac add_session_group;
 include:jac enable_access;
 

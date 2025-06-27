@@ -184,9 +184,12 @@ node AccessControlAction :Action: {
 
     can add_session_group(group_name:str, session_ids:list) {
         # adds a session group to the session_groups dict
+        _group = self.add_group(name=group_name);
+        # create permissions 
+        users = self.init_permissions().users;
 
         for session_id in session_ids {
-            result = self.add_user_to_group(group_name, session_id);
+            result = self.add_user(user_id=session_id, users=users, group=_group);
             if not result {
                 return False;
             }
@@ -204,11 +207,10 @@ node AccessControlAction :Action: {
     can in_session_group(session_id:str, group_names:list) {
         # checks if a session_id is in any of the session groups provided in the list
         groups = self.get_groups(include_users=True, group=group_names);
+
         for name in group_names {
-            for group in groups {
-                if(session_id in group['users'] and group['name'] == name) {
-                    return True;
-                }
+            if(name in groups and session_id in groups[name]) {
+                return True;
             }
         }
 
@@ -294,22 +296,19 @@ node AccessControlAction :Action: {
         # get collection
         collection = self.get_collection();
 
-        last_channel = "";
-        last_resource = "";
-        permission_resource_allow = [];
-        permission_resource_deny = [];
+        # create permissions 
+        result = self.init_permissions();
+        resources = result.resources;
+        groups = result.groups;
+        users = result.users;
+
 
         # add permission to collection
         for permission_channel in permissions {
-            # add channel to collection
-            channel = (collection spawn _add_channel(permission_channel)).channel;
+            _channel = self.add_channel(name=permission_channel);
 
             for permission_resource in permissions[permission_channel] {
-                if last_channel != permission_channel {
-                    # add new resource to channel
-                    resource = (collection spawn _add_resource(name=permission_resource, new_resource=True)).resource;
-                    channel ++> resource;
-                }
+                _resource = self.add_resource(name=permission_resource, resources=resources, channel=_channel);
                 # get allow and deny permissions
                 permission_resource_allow = list(permissions[permission_channel][permission_resource]["allow"]);
                 permission_resource_deny = list(permissions[permission_channel][permission_resource]["deny"]);
@@ -317,55 +316,31 @@ node AccessControlAction :Action: {
                 # add allow permissions
                 for item in permission_resource_allow {
                     if ( "group" in item ) {
-                        if last_resource != permission_resource {
-                            # add group to collection
-                            group = (collection spawn _add_group(name=item['group'], new_group=True)).group;
-                            resource +:Allow:enabled=item["enabled"]:+> group;
-                        }
+                        self.add_group(name=item['group'], access=True, enabled=item["enabled"], groups=groups, resource=_resource);
                     } elif ( "user" in item ) {
-                        if last_resource != permission_resource {
-                            # add user to collection
-                            user = (collection spawn _add_user(user_id=item["user"], new_user=True)).user;
-                            resource +:Allow:enabled=item["enabled"]:+> user;
-                        }
+                        self.add_user(user_id=item["user"], access=True, enabled=item["enabled"], users=users, resource=_resource);
                     }
                 }
 
                 # add deny permissions
                 for item in permission_resource_deny {
-                    # check if item in both allow and deny
                     if(item not in permission_resource_allow) {
                         if ( "group" in item ) {
-                            if last_resource != permission_resource {
-                                # add group to collection
-                                group = (collection spawn _add_group(name=item['group'], new_group=True)).group;
-                                resource +:Deny:enabled=item["enabled"]:+> group;
-                            }
+                            self.add_group(name=item['group'], access=False, enabled=item["enabled"], groups=groups, resource=_resource);
                         } elif( "user" in item ) {
-                            if last_resource != permission_resource {
-                                # add user to collection
-                                user = (collection spawn _add_user(user_id=item["user"], new_user=True)).user;
-                                resource +:Deny:enabled=item["enabled"]:+> user;
-                            }
+                            self.add_user(user_id=item["user"], access=False, enabled=item["enabled"], users=users, resource=_resource);
                         }
                     } else {
                         self.logger.error(f"{item} is in both allow and deny");
                         return False;
                     }
                 }
-
-                last_resource = permission_resource;
             }
-
-            last_channel = permission_channel;
-            last_resource = "";
         }
 
         # add user to group
         for session_group in session_groups {
-            for user in session_groups[session_group] {
-                self.add_user_to_group(session_group, user);
-            }
+            self.add_session_group(group_name=session_group, session_ids=session_groups[session_group]);
         }
         return True;
     }
@@ -399,92 +374,95 @@ node AccessControlAction :Action: {
 
 
     # add permissions to collection
+    can init_permissions() -> dict {
+        collection = self.get_collection();
+        return (collection spawn _init_permissions());
+    }
     can add_channel(name:str) -> dict {
         collection = self.get_collection();
-        return (collection spawn _add_channel(name=name));
+        return (collection spawn _add_channel(name=name)).channel;
     }
 
-    can add_resource(name:str, parent_node:str = "") -> dict {
-        collection = self.get_collection();
-        return (collection spawn _add_resource(name=name, parent_node=parent_node));
+    can add_resource(name:str, resources:Resources = None, channel:Channel = None) -> dict {
+        if(channel) {
+            return (channel spawn _add_resource(name=name, resources=resources)).resource;
+        } else {
+            collection = self.get_collection();
+            return (collection spawn _add_resource(name=name)).resource;
+        }
     }
 
-    can add_group(name:str, parent_node:str = "") -> dict {
-        collection = self.get_collection();
-        return (collection spawn _add_group(name=name, parent_node=parent_node));
+    can add_group(name:str, access:bool = True, enabled:bool = True, groups:Groups = None, resource:Resource = None) -> dict {
+        group = self.get_groups(group=name);
+        if len(group) > 0 {
+            group = list(group.values())[0];
+            if(resource) {
+                return (resource spawn _add_group(group=group, access=access, enabled=enabled)).group;
+            }else {
+                return group;
+            }
+        }else {
+            if(resource) {
+                return (resource spawn _add_group(name=name, access=access, enabled=enabled, groups=groups)).group;
+            }else{
+                collection = self.get_collection();
+                return (collection spawn _add_group(name=name)).group;
+            }
+        }
     }
 
-    can add_user(user_id:str, parent_node:str = "") -> dict {
-        collection = self.get_collection();
-        return (collection spawn _add_user(user_id=user_id, parent_node=parent_node));
+    can add_user(user_id:str, access:bool = True, enabled:bool = True, users:Users = None, resource:Resource = None, group:Group = None) -> dict {
+        user = self.get_users(user_id=user_id);
+        if len(user) > 0 {
+            user = user[0];
+            if group {
+                return (group spawn _add_user(user=user)).user;
+            }elif(resource) {
+                return (resource spawn _add_user(user=user, access=access, enabled=enabled)).user;
+            }else {
+                return user;
+            }
+        }else{
+            if group {
+                return (group spawn _add_user(user_id=user_id, users=users)).user;
+            }elif(resource) {
+                return (resource spawn _add_user(user_id=user_id, access=access, enabled=enabled, users=users)).user;
+            }else {
+                collection = self.get_collection();
+                return (collection spawn _add_user(user_id=user_id)).user;
+            }
+        }
     }
 
-    can add_permission(channel:str, resource:str, allow:bool, user_id:str) -> bool {
+    can add_permission(channel:str, resource:str, allow:bool, entity:str, is_group:bool=False) -> bool {
         try {
             collection = self.get_collection();
+            # create permissions 
+            result = self.init_permissions();
+            resources = result.resources;
+            groups = result.groups;
+            users = result.users;
 
-            channel_result = (collection spawn _add_channel(name=channel));
-            # add edge to new node
-            if channel_result.new_channel {
-                collection ++> channel_result.channel;
-            }
 
-            resource_result = (collection spawn _add_resource(name=resource, parent_node=channel_result.channel.id));
-            # add edge to new node
-            if resource_result.new_resource {
-                channel_result.channel ++> resource_result.resource;
-            }
-
+            _channel = self.add_channel(name=channel);
+            _resource = self.add_resource(name=resource, resources=resources, channel=_channel);
 
             if allow {
-                if ( bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', user_id)) or user_id == "any" ) {
-                    group_result = (collection spawn _add_group(name=user_id, parent_node=resource_result.resource.id));
-                    # delete existing edges and add new edge
-                    resource_result.resource del -:Allow:-> group_result.group;
-                    resource_result.resource del -:Deny:-> group_result.group;
-                    resource_result.resource +:Allow:+> group_result.group;
-                } elif( bool(re.match(r'^\d+$', user_id)) or user_id == "any" ) {
-                    user_result = (collection spawn _add_user(user_id=user_id, parent_node=resource_result.resource.id));
-                    # delete existing edges and add new edge
-                    resource_result.resource del -:Deny:-> user_result.user;
-                    resource_result.resource del -:Allow:-> user_result.user;
-                    resource_result.resource +:Allow:+> user_result.user;
+                if ( is_group ) {
+                    _group = self.add_group(name=entity, access=True, enabled=True, groups=groups, resource=_resource);
+                } else {
+                    _user = self.add_user(user_id=entity, access=True, enabled=True, users=users, resource=_resource);
                 }
             } else {
-                if ( bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', user_id)) or user_id == "any" ) {
-                    group_result = (collection spawn _add_group(name=user_id, parent_node=resource_result.resource.id));
-                    # delete existing edges and add new edge
-                    resource_result.resource del -:Allow:-> group_result.group;
-                    resource_result.resource del -:Deny:-> group_result.group;
-                    resource_result.resource +:Deny:+> group_result.group;
-                } elif( bool(re.match(r'^\d+$', user_id)) or user_id == "any" ) {
-                    user_result = (collection spawn _add_user(user_id=user_id, parent_node=resource_result.resource.id));
-                    # delete existing edges and add new edge
-                    resource_result.resource del -:Allow:-> user_result.user;
-                    resource_result.resource del -:Deny:-> user_result.user;
-                    resource_result.resource +:Deny:+> user_result.user;
+                if ( is_group ) {
+                    _group = self.add_group(name=entity, access=False, enabled=True, groups=groups, resource=_resource);
+                } else {
+                    _user = self.add_user(user_id=entity, access=False, enabled=True, users=users, resource=_resource);
                 }
             }
             return True;
         } except Exception as e {
             self.logger.error(f"Error adding permission: {e}");
-            return False;
-        }
-    }
-
-    can add_user_to_group(group:str, user_id:str) -> bool {
-        collection = self.get_collection();
-
-        try {
-            group_result = (collection spawn _add_group(name=group));
-            user_result = (collection spawn _add_user(user_id=user_id, parent_node=group_result.group.id));
-            # add edge to new node
-            if user_result.new_user {
-                group_result.group ++> user_result.user;
-            }
-            return True;
-        } except Exception as e {
-            self.logger.error(f"Error adding user to group: {e}");
             return False;
         }
     }
@@ -529,7 +507,14 @@ node AccessControlAction :Action: {
     }
 
     can get_interact_actions -> list[str] {
-        return (self.get_agent() spawn _get_interact_actions()).actions;
+        action_nodes = self.get_agent().get_actions().get_all(only_interact_actions=True);
+        actions = ["any", "all"];
+
+        for action_node in action_nodes {
+            actions.append(action_node.get_type());
+        }
+
+        return actions;
     }
 
     # get permissions
@@ -543,14 +528,14 @@ node AccessControlAction :Action: {
         return (collection spawn _get_resources()).resources;
     }
 
-    can get_groups(group:str="", include_users:bool=False) -> list {
+    can get_groups(group:str="", include_users:bool=False) -> dict {
         collection = self.get_collection();
         return (collection spawn _get_groups(group=group, include_users=include_users)).groups;
     }
 
-    can get_users(out_of_groups:bool=False) -> list[str] {
+    can get_users(out_of_groups:bool=False, user_id:str="") -> list[str] {
         collection = self.get_collection();
-        return (collection spawn _get_users(out_of_groups=out_of_groups)).users;
+        return (collection spawn _get_users(out_of_groups=out_of_groups, user_id=user_id)).users;
     }
 
     can get_access(channel:str="Default", resource:str="any") -> dict {
@@ -558,42 +543,81 @@ node AccessControlAction :Action: {
         return (collection spawn _get_access(channel=channel, resource=resource)).access;
     }
 
-    can enable_access(user:str, channel:str, resource:str, enabled:bool=True) -> bool {
+    can enable_access(user:str, group:str, channel:str, resource:str, enabled:bool=True) -> bool {
         collection = self.get_collection();
-        return (collection spawn _enable_access(user=user, channel=channel, resource=resource, enabled=enabled)).result;
+        return (collection spawn _enable_access(user=user, group=group, channel=channel, resource=resource, enabled=enabled)).result;
     }
 
 }
 
 # add permissions to collection
+walker _init_permissions {
+    has users:Users = None;
+    has groups:Groups = None;
+    has channels:Channels = None;
+    has resources:Resources = None;
+    
+    can on_collection with Collection entry {
+        visit [-->](`?Users) else {
+            here ++> Users();
+            visit [-->](`?Users);
+        }
+
+        visit [-->](`?Groups) else {
+            here ++> Groups();
+            visit [-->](`?Groups);
+        }
+
+        visit [-->](`?Channels) else {
+            here ++> Channels();
+            visit [-->](`?Channels);
+        }
+
+        visit [-->](`?Resources) else {
+            here ++> Resources();
+            visit [-->](`?Resources);
+        }
+    }
+
+    can on_users with Users entry {
+        self.users = here;
+    }
+
+    can on_groups with Groups entry {
+        self.groups = here;
+    }
+
+    can on_channels with Channels entry {
+        self.channels = here;
+    }
+
+    can on_resources with Resources entry {
+        self.resources = here;
+    }
+
+}
 
 walker _add_channel {
     has name:str = "";
     has channel:Channel = None;
-    has new_channel:bool = False;
+
 
     can on_collection with Collection entry {
         visit [-->](`?Channels) else {
-            channels = Channels();
-            here ++> channels;
+            here ++> Channels();
             visit [-->](`?Channels);
         }
     }
 
     can on_channels with Channels entry {
         visit [-->](`?Channel)(?name == self.name) else {
-            if self.name == "any" {
-                channel = AnyChannel(name=self.name);
-            }elif(self.name == "default") {
-                channel = DefaultChannel(name=self.name);
-            } else {
-                channel = Channel(name=self.name);
+            if self.name in ["default"] {
+                here ++> AnyChannel(name=self.name);
+            }else{
+                here ++> Channel(name=self.name);
             }
-            here ++> channel;
-            self.channel = channel;
-            self.new_channel = True;
-
-        }
+            visit [-->](`?Channel)(?name == self.name);
+        };
     }
 
     can on_channel with Channel entry {
@@ -604,142 +628,208 @@ walker _add_channel {
 walker _add_resource {
     has name:str = "";
     has resource:Resource = None;
-    has parent_node:str = "";
-    has new_resource:bool = False;
+    has resources:Resources = None;
+    has is_new:bool = False;
+
 
     can on_collection with Collection entry {
         visit [-->](`?Resources) else {
-            resources = Resources();
-            here ++> resources;
+            here ++> Resources();
             visit [-->](`?Resources);
         }
     }
 
     can on_resources with Resources entry {
-        if self.new_resource {
-            if self.name == "any" {
-                resource = AnyResource(name=self.name);
-            }else{
-                resource = Resource(name=self.name);
+        visit [-->](`?Resource)(?name == self.name) else {
+            self.is_new = True;
+            if self.name in ["any", "all"] {
+                here ++> AnyResource(name=self.name);
+            } else {
+                here ++> Resource(name=self.name);
             }
-            here ++> resource;
-            self.resource = resource;
-        }else {
-            visit [-->](`?Resource)(?name==self.name) else {
-                if self.name == "any" {
-                    resource = AnyResource(name=self.name);
-                }else{
-                    resource = Resource(name=self.name);
-                }
-                here ++> resource;
-                self.resource = resource;
-                self.new_resource = True;
+            visit [-->](`?Resource)(?name == self.name);
+        };
+    }
+
+
+    can on_channel with Channel entry {
+        visit [-->](`?Resource)(?name == self.name) else {
+            self.is_new = True;
+            if self.name in ["any", "all"] {
+                here ++> AnyResource(name=self.name);
+            } else {
+                here ++> Resource(name=self.name);
             }
-        }
+            visit [-->](`?Resource)(?name == self.name);
+        };
     }
 
     can on_resource with Resource entry {
-        edges = [<--];
-        edge_found = False;
-        for e in edges {
-            if e.id == self.parent_node {
-                edge_found = True;
-                break;
-            }
-        }
-        if not edge_found {
-            self.new_resource = True;
-        }
         self.resource = here;
+    }
+
+
+    can on_exit with exit {
+        if self.is_new and self.resources {
+           self.resources ++> self.resource;
+        }
     }
 }
 
 walker _add_group {
     has name:str = "";
     has group:Group = None;
-    has parent_node:str = "";
-    has new_group:bool = False;
+    has groups:Groups = None;
+    has is_new:bool = False;
+    has access:bool = True;
+    has enabled:bool = True;
 
     can on_collection with Collection entry {
         visit [-->](`?Groups) else {
-            groups = Groups();
-            here ++> groups;
+            here ++> Groups();
             visit [-->](`?Groups);
         }
     }
 
     can on_groups with Groups entry {
         visit [-->](`?Group)(?name == self.name) else {
+            self.is_new = True;
             if self.name in ["any", "all"] {
-                group = AnyGroup(name=self.name);
+                here ++> AnyGroup(name=self.name);
             } else {
-                group = Group(name=self.name);
+                here ++> Group(name=self.name);
             }
-            here ++> group;
-            self.group = group;
-            self.new_group = True;
-        }
+            visit [-->](`?Group)(?name == self.name);
+        };
+    }
+
+
+    can on_resource with Resource entry {
+        visit [-->](`?Group)(?name == self.name) else {
+            if self.group {
+                if self.access {
+                    here +:Allow:enabled=self.enabled:+> self.group;
+                }else{
+                    here +:Deny:enabled=self.enabled:+> self.group;
+                }
+            }else {
+                self.is_new = True;
+                if self.access{
+                    if self.name in ["any", "all"] {
+                        here +:Allow:enabled=self.enabled:+> AnyGroup(name=self.name);
+                    } else {
+                        here +:Allow:enabled=self.enabled:+> Group(name=self.name);
+                    }
+                    visit [-:Allow:->](`?Group)(?name == self.name);
+                }else{
+                    if self.name in ["any", "all"] {
+                        here +:Deny:enabled=self.enabled:+> AnyGroup(name=self.name);
+                    } else {
+                        here +:Deny:enabled=self.enabled:+> Group(name=self.name);
+                    }
+                    visit [-:Deny:->](`?Group)(?name == self.name);
+                }
+            }
+        };
     }
 
     can on_group with Group entry {
-        edges = [<--];
-        edge_found = False;
-        for e in edges {
-            if e.id == self.parent_node {
-                edge_found = True;
-                break;
-            }
-        }
-        if not edge_found {
-            self.new_group = True;
-        }
         self.group = here;
+    }
+
+
+    can on_exit with exit {
+        if self.is_new and self.groups {
+           self.groups ++> self.group;
+        }
     }
 }
 
 walker _add_user {
     has user_id:str = "";
     has user:User = None;
-    has parent_node:str = "";
-    has new_user:bool = False;
+    has users:Users = None;
+    has is_new:bool = False;
+    has access:bool = True;
+    has enabled:bool = True;
+    has duplicate:list = [];
+    
 
     can on_collection with Collection entry {
         visit [-->](`?Users) else {
-            users = Users();
-            here ++> users;
+            here ++> Users();
             visit [-->](`?Users);
         }
     }
 
     can on_users with Users entry {
         visit [-->](`?User)(?user_id == self.user_id) else {
+            self.is_new = True;
             if self.user_id in ["any", "all"] {
-                user = AnyUser(user_id=self.user_id);
+                here ++> AnyUser(user_id=self.user_id);
             } else {
-                user = User(user_id=self.user_id);
+                here ++> User(user_id=self.user_id);
             }
-            here ++> user;
-            self.user = user;
-            self.new_user = True;
-        }
+            visit [-->](`?User)(?user_id == self.user_id);
+        };
+    }
+
+
+    can on_resource with Resource entry {
+        visit [-->](`?User)(?user_id == self.user_id) else {
+            if self.user {
+                if self.access {
+                    here +:Allow:enabled=self.enabled:+> self.user;
+                }else {
+                    here +:Deny:enabled=self.enabled:+> self.user;
+                }
+            }else {
+                self.is_new = True;
+                if self.access{
+                    if self.user_id in ["any", "all"] {
+                        here +:Allow:enabled=self.enabled:+> AnyUser(user_id=self.user_id);
+                    } else {
+                        here +:Allow:enabled=self.enabled:+> User(user_id=self.user_id);
+                    }
+                    visit [-:Allow:->](`?User)(?user_id == self.user_id);
+                }else{
+                    if self.user_id in ["any", "all"] {
+                        here +:Deny:enabled=self.enabled:+> AnyUser(user_id=self.user_id);
+                    } else {
+                        here +:Deny:enabled=self.enabled:+> User(user_id=self.user_id);
+                    }
+                    visit [-:Deny:->](`?User)(?user_id == self.user_id);
+                }
+            }
+        };
+    }
+
+    can on_group with Group entry {
+        visit [-->](`?User)(?user_id == self.user_id) else {
+            if self.user {
+                here ++> self.user;
+            }else {
+                self.is_new = True;
+                if self.user_id in ["any", "all"] {
+                    here ++> AnyUser(user_id=self.user_id);
+                } else {
+                    here ++> User(user_id=self.user_id);
+                }
+                visit [-->](`?User)(?user_id == self.user_id);
+            }
+        };
     }
 
     can on_user with User entry {
-        edges = [<--];
-        edge_found = False;
-        for e in edges {
-            if e.id == self.parent_node {
-                edge_found = True;
-                break;
-            }
-        }
-        if not edge_found {
-            self.new_user = True;
-        }
         self.user = here;
     }
-}
 
+    can on_exit with exit {
+        if self.is_new and self.users {
+           self.users ++> self.user;
+        }
+    }
+}
 # delete permissions from collection
 walker _delete_channel {
     has name:str = "";
@@ -951,19 +1041,16 @@ walker _delete_permission {
 
         }
 
-        visit [-->](`?Group)(?name == self.group) else {
-            visit [-->](`?User)(?user_id == self.user_id);
+        if ([-->](`?Group)(?name == self.group)) {
+            here del --> [-->](`?Group)(?name == self.group);
+            self.deleted.append(here);
+        }elif ([-->](`?User)(?user_id == self.user_id)) {
+            here del --> [-->](`?User)(?user_id == self.user_id);   
+            self.deleted.append(here);
         }
-    }
 
-    can on_group with Group entry {
-        here del <-- [<--](`?Resource)(?name == self.resource);
-        self.deleted.append(here);
-    }
-
-    can on_user with User entry {
-        here del <-- [<--](`?Resource)(?name == self.resource);
-        self.deleted.append(here);
+        print("self.deleted");
+        print(self.deleted);
     }
 
 }
@@ -1001,7 +1088,7 @@ walker _get_resources {
 }
 
 walker _get_groups {
-    has groups:list = [];
+    has groups:dict = {};
     has group:str = "";
     has include_users:bool = False;
 
@@ -1018,22 +1105,23 @@ walker _get_groups {
     }
 
     can on_group with Group entry {
-        users = [-->](`?User);
-        user_ids = [];
-        for user in users {
-            user_ids.append(user.user_id);
-        }
 
         if(self.include_users){
-            self.groups.append({"name": here.name, "users": user_ids});
+            users = [-->](`?User);
+            user_ids = [];
+            for user in users {
+                user_ids.append(user.user_id);
+            }
+            self.groups[here.name] = user_ids;
         }else {
-            self.groups.append(here);
+            self.groups[here.name] = here;
         }
     }
 }
 
 walker _get_users {
     has users:list = [];
+    has user_id:str = "";
     has out_of_groups:bool = False;
 
     can on_collection with Collection entry {
@@ -1041,7 +1129,11 @@ walker _get_users {
     }
 
     can on_users with Users entry {
-        visit [-->](`?User);
+        if self.user_id {
+            visit [-->](`?User)(?user_id == self.user_id);
+        } else {
+            visit [-->](`?User);
+        }
     }
 
     can on_user with User entry {
@@ -1116,17 +1208,19 @@ walker _export_permissions {
 
     can on_channel with Channel entry {
         visit [-->](`?Resource);
+        self.permissions[here.name] = {};
     }
 
     can on_resource with Resource entry {
         channel = [<--](`?Channel)[0].name;
+
         allow_list = [];
         deny_list = [];
 
         allow_nodes_disabled = [-:Allow:enabled==False:->];
         allow_nodes_enabled = [-:Allow:enabled==True:->];
-        deny_nodes_enabled = [-:Deny:enabled==True:->];
         deny_nodes_disabled = [-:Deny:enabled==False:->];
+        deny_nodes_enabled = [-:Deny:enabled==True:->];
 
 
         for allow_node in allow_nodes_enabled {
@@ -1163,15 +1257,7 @@ walker _export_permissions {
             }
         }
 
-
-        if channel not in self.permissions.keys() {
-            self.permissions[channel] = {here.name: {"allow": allow_list, "deny": deny_list}};
-        }elif(here.name not in self.permissions[channel].keys()) {
-            self.permissions[channel][here.name] = {"allow": allow_list, "deny": deny_list};
-        } else{
-            self.permissions[channel][here.name]["allow"].extend(allow_list);
-            self.permissions[channel][here.name]["deny"].extend(deny_list);
-        }
+        self.permissions[channel][here.name] = {"allow": allow_list, "deny": deny_list};
 
         visit [-->](`?Group);
 
@@ -1213,8 +1299,10 @@ walker _has_access {
         if not self.resource {
             self.user_id = "any";
         }
+
         visit [-->](`?Channels);
     }
+
 
     can on_channels with Channels entry {
         visit [-->](`?Channel)(?name==self.channel);
@@ -1303,35 +1391,11 @@ walker _has_explicit_deny_access {
 }
 
 
-walker _get_interact_actions {
-
-    has actions:list[str] = ["all", "any"];
-
-    obj __specs__ {
-        static has private:bool = True;
-    }
-
-    can on_agent with Agent entry {
-        visit [-->](`?Actions);
-    }
-
-    can on_actions with Actions entry {
-        visit [-->];
-    }
-
-    can on_interact_action with InteractAction entry {
-        if(here.get_type() not in ["ExitInteractAction"]){
-            self.actions.append(here.get_type());
-        }
-    }
-
-}
-
-
 walker _enable_access {
 
     has enabled:bool = True;
     has user:str = "";
+    has group:str = "";
     has channel:str = "";
     has resource:str = "";
     has result:bool = False;
@@ -1350,32 +1414,38 @@ walker _enable_access {
         visit [-->](`?Resource)(?name==self.resource);
     }
     can on_resource with Resource entry {
-        allow_user_edges = [-:Allow:->](`?User)(?user_id==self.user);
-        deny_user_edges = [-:Deny:->](`?User)(?user_id==self.user);
-        allow_group_edges = [-:Allow:->](`?Group)(?name==self.user);
-        deny_group_edges = [-:Deny:->](`?Group)(?name==self.user);
 
 
-        if allow_user_edges {
-            here del --> [-->](`?User)(?user_id == allow_user_edges[0].user_id);
-            here +:Allow:enabled=self.enabled:+> allow_user_edges[0];
-        }
+        if (self.user) {
+            allow_user_edges = [-:Allow:->](`?User)(?user_id==self.user);
+            deny_user_edges = [-:Deny:->](`?User)(?user_id==self.user);
 
-        if deny_user_edges {
-            here del --> [-->](`?User)(?user_id == deny_user_edges[0].user_id);
-            here +:Deny:enabled=self.enabled:+> deny_user_edges[0];
-        }
+            if allow_user_edges {
+                here del --> [-->](`?User)(?user_id == allow_user_edges[0].user_id);
+                here +:Allow:enabled=self.enabled:+> allow_user_edges[0];
+            }
 
-        if allow_group_edges {
-            here del --> [-->](`?Group)(?name == allow_group_edges[0].name);
-            here +:Allow:enabled=self.enabled:+> allow_group_edges[0];
-        }
+            if deny_user_edges {
+                here del --> [-->](`?User)(?user_id == deny_user_edges[0].user_id);
+                here +:Deny:enabled=self.enabled:+> deny_user_edges[0];
+            }
+        } elif( self.group ){
+            allow_group_edges = [-:Allow:->](`?Group)(?name==self.group);
+            deny_group_edges = [-:Deny:->](`?Group)(?name==self.group);
 
-        if deny_group_edges {
-            here del --> [-->](`?Group)(?name == deny_group_edges[0].name);
-            here +:Deny:enabled=self.enabled:+> deny_group_edges[0];
+            if allow_group_edges {
+                here del --> [-->](`?Group)(?name == allow_group_edges[0].name);
+                here +:Allow:enabled=self.enabled:+> allow_group_edges[0];
+            }
+
+            if deny_group_edges {
+                here del --> [-->](`?Group)(?name == deny_group_edges[0].name);
+                here +:Deny:enabled=self.enabled:+> deny_group_edges[0];
+            }
         }
 
         self.result = True;
     }
 }
+
+

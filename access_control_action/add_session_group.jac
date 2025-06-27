@@ -6,7 +6,7 @@ import:jac from jivas.agent.action.actions { Actions }
 import:jac from jivas.agent.action.interact_graph_walker { interact_graph_walker }
 
 
-walker add_user_to_group :interact_graph_walker: {
+walker add_session_group :interact_graph_walker: {
 
     has user_id:str = "";
     has group:str = "";
@@ -24,7 +24,7 @@ walker add_user_to_group :interact_graph_walker: {
     }
 
     can on_action with Action entry {
-        self.response = here.add_user_to_group(group=self.group, user_id=self.user_id);
+        self.response = here.add_session_group(group_name=self.group, session_ids=[self.user_id]);
     }
 
 }

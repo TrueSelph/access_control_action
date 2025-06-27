@@ -227,7 +227,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                 st.error("Failed to get user.")
 
     with st.expander("Manage Groups", False):
-        add_tab, add_user_to_group_tab, groups_tab = st.tabs(
+        add_tab, add_session_group_tab, groups_tab = st.tabs(
             ["Add Group", "Add User to Group", "Groups"]
         )
 
@@ -245,13 +245,17 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                 time.sleep(2)
                 st.rerun()
 
-        with add_user_to_group_tab:
+        with add_session_group_tab:
             groups_result = call_action_walker_exec(
                 agent_id, module_root, "get_groups", {"include_users": True}
             )
             users = call_action_walker_exec(agent_id, module_root, "get_users", {})
 
-            groups = [group["name"] for group in groups_result]
+            if groups_result:
+                groups = groups_result.keys()
+            else:
+                groups = []
+
             users = [user["user_id"] for user in users]
             if not groups:
                 st.error("Failed to get groups.")
@@ -264,12 +268,12 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                 "Select Group", groups, key=f"{model_key}_select_group"
             )
 
-            if st.button("Add User to Group", key=f"{model_key}_btn_add_user_to_group"):
+            if st.button("Add User to Group", key=f"{model_key}_btn_add_session_group"):
                 # Call the function to purge
                 if result := call_action_walker_exec(
                     agent_id,
                     module_root,
-                    "add_user_to_group",
+                    "add_session_group",
                     {"group": group, "user_id": user_id},
                 ):
                     st.success("Group added successfully")
@@ -280,9 +284,8 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
 
         with groups_tab:
 
-            for item in groups_result:
-                group_name = item.get("name", "Unnamed Group")
-                users = item.get("users", [])
+            for group_name in groups_result:
+                users = groups_result[group_name]
                 if group_name not in ["all", "any"]:
 
                     # Group header row
@@ -344,7 +347,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                                         "delete_user",
                                         {"group": group_name, "user_id": user},
                                     )
-                                    st.write(result)
+
                                     if result:
                                         st.success(
                                             f"User '{user}' removed from '{group_name}'"
@@ -367,39 +370,53 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
         st.subheader("Add Permissions")
         # Channel selection
         channels = call_action_walker_exec(agent_id, module_root, "get_channels", {})
-        if not channels:
-            st.write("Channels not found")
-            return
+        if channels:
+            channel = st.selectbox("Channels", channels, key=f"{model_key}_select_channels")
+        else:
+            channel = ""
+            st.warning("Channels not found")
+
 
         # Resource selection
         resources = call_action_walker_exec(agent_id, module_root, "get_resources", {})
-        if not resources:
-            st.write("Resources not found")
-            return
+        if resources:
+            resource = st.selectbox(
+                "Resource", resources, key=f"{model_key}_select_resources"
+            )
+        else:
+            resource = ""
+            st.warning("Resources not found")
 
         # group selection
-        groups_result = call_action_walker_exec(
-            agent_id, module_root, "get_groups", {"include_users": True}
-        )
-        if not groups_result:
-            st.write("Groups not found")
-            return
-        groups = [group["name"] for group in groups_result]
+        groups_result = call_action_walker_exec(agent_id, module_root, "get_groups", {"include_users": True})
+        if groups_result:
+            groups = list(groups_result.keys())
+        else:
+            groups = []
+            st.warning("Groups not found")
 
         # user selection
         users = call_action_walker_exec(agent_id, module_root, "get_users", {})
-        if not users:
-            st.write("Users not found")
-        groups.extend([user["user_id"] for user in users])
+        if users:
+            users_ids = [user["user_id"] for user in users]
+            groups.extend(users_ids)
+        
+        if groups:
+            user_id = st.selectbox(
+                "Entity", groups, key=f"{model_key}_select_groups_and_users"
+            )
+        else:
+            user_id = ""
+            st.warning("Groups and Users not found")
 
         # select inputs
-        channel = st.selectbox("Channels", channels, key=f"{model_key}_select_channels")
-        resource = st.selectbox(
-            "Resource", resources, key=f"{model_key}_select_resources"
-        )
-        user_id = st.selectbox(
-            "Groups and Users", groups, key=f"{model_key}_select_groups_and_users"
-        )
+        # channel = st.selectbox("Channels", channels, key=f"{model_key}_select_channels")
+        # resource = st.selectbox(
+        #     "Resource", resources, key=f"{model_key}_select_resources"
+        # )
+        # user_id = st.selectbox(
+        #     "Groups and Users", groups, key=f"{model_key}_select_groups_and_users"
+        # )
         access = st.selectbox(
             "Access", ["allow", "deny"], key=f"{model_key}_select_access"
         )
@@ -419,9 +436,6 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                 allow_list = result.get("allow", [])
                 deny_list = result.get("deny", [])
 
-                group_dict = {}
-                for g in groups_result:
-                    group_dict[g["name"]] = g["users"]
 
                 allow_list_formatted = []
                 deny_list_formatted = []
@@ -434,8 +448,8 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                     else:
                         allow_list_formatted.append(item["name"])
                         # append group user to allow list
-                        if item["name"] in group_dict:
-                            allow_group.extend(group_dict[item["name"]])
+                        if item["name"] in groups_result:
+                            allow_group.extend(groups_result[item["name"]])
 
                 for item in deny_list:
                     if "user_id" in item:
@@ -443,10 +457,9 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                     else:
                         deny_list_formatted.append(item["name"])
                         # append group user to deny list
-                        if item["name"] in group_dict:
-                            deny_group.extend(group_dict[item["name"]])
+                        if item["name"] in groups_result:
+                            deny_group.extend(groups_result[item["name"]])
 
-                current_access = user_id in allow_list_formatted
                 if user_id in deny_group:
                     st.error(
                         "User is in a GROUP that already has ALLOW access to this resource"
@@ -467,8 +480,9 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                         {
                             "channel": channel,
                             "resource": resource,
-                            "allow": current_access,
-                            "user_id": user_id,
+                            "allow": access == "allow",
+                            "entity": user_id,
+                            "is_group": user_id in groups_result
                         },
                     )
 
@@ -479,26 +493,6 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
 
                     time.sleep(2)
                     st.rerun()
-            else:
-                access_result = call_action_walker_exec(
-                    agent_id,
-                    module_root,
-                    "add_permission",
-                    {
-                        "channel": channel,
-                        "resource": resource,
-                        "allow": access == "allow",
-                        "user_id": user_id,
-                    },
-                )
-
-                if access_result:
-                    st.success("Update successfully")
-                else:
-                    st.error("Failed to update permissions")
-
-                time.sleep(2)
-                st.rerun()
 
     with st.expander("Permissions", True):
         # Initialize and fetch permissions
@@ -522,9 +516,9 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                                 "channel": channel,
                                 "resource": resource,
                                 "permission": "Allow",
-                                "user": user.get("name")
-                                or user.get("user_id", "Unknown"),
-                                "type": "group" if user.get("name") else "user",
+                                "entity": user.get("group")
+                                or user.get("user", "Unknown"),
+                                "type": "group" if user.get("group") else "user",
                             }
                         )
 
@@ -535,22 +529,22 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                                 "channel": channel,
                                 "resource": resource,
                                 "permission": "Deny",
-                                "user": user.get("name")
-                                or user.get("user_id", "Unknown"),
-                                "type": "group" if user.get("name") else "user",
+                                "entity": user.get("group")
+                                or user.get("user", "Unknown"),
+                                "type": "group" if user.get("group") else "user",
                             }
                         )
 
+
             # Initialize session state with proper column handling
-            # if "df_permissions" not in st.session_state:
-            columns = ["enabled", "channel", "resource", "permission", "user", "type"]
+            columns = ["enabled", "channel", "resource", "permission", "entity", "type"]
             # Create empty DataFrame with all columns if no permissions exist
             st.session_state.df_permissions = pd.DataFrame(
                 formatted_permissions if formatted_permissions else [], columns=columns
             )
 
             # Ensure all columns exist in session state
-            required_columns = ["enabled", "channel", "resource", "permission", "user"]
+            required_columns = ["enabled", "channel", "resource", "permission", "entity"]
             for col in required_columns:
                 if col not in st.session_state.df_permissions:
                     st.session_state.df_permissions[col] = (
@@ -592,9 +586,9 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             if resource_filter and "resource" in filtered_df:
                 filtered_df = filtered_df[filtered_df["resource"].isin(resource_filter)]
 
-            if user_filter and "user" in filtered_df:
+            if user_filter and "entity" in filtered_df:
                 filtered_df = filtered_df[
-                    filtered_df["user"].str.contains(user_filter, case=False, na=False)
+                    filtered_df["entity"].str.contains(user_filter, case=False, na=False)
                 ]
 
             if permission_filter != "All" and "permission" in filtered_df:
@@ -609,7 +603,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                     "Enabled",
                     "Channel",
                     "Resource",
-                    "User/Group",
+                    "Entity",
                     "Permission",
                     "Delete",
                 ]
@@ -641,7 +635,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                     with cols[2]:
                         st.write(row.get("resource", "N/A"))
                     with cols[3]:
-                        st.write(row.get("user", "Unknown"))
+                        st.write(row.get("entity", "Unknown"))
                     with cols[4]:
                         st.write(row.get("permission", "N/A"))
 
@@ -653,17 +647,29 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
 
                     # Submit button for the form
                     if enable_submitted:
+                        
+                        if row.get("type") == "group":
+                            payload = {
+                                "enabled": not bool(row.get("enabled")),
+                                "channel": row.get("channel", ""),
+                                "resource": row.get("resource", ""),
+                                "group": row.get("entity", ""),
+                                "user": "",
+                            }
+                        else:
+                            payload = {
+                                "enabled": not bool(row.get("enabled")),
+                                "channel": row.get("channel", ""),
+                                "resource": row.get("resource", ""),
+                                "user": row.get("entity", ""),
+                                "group": "",
+                            }
 
                         if call_action_walker_exec(
                             agent_id,
                             module_root,
                             "enable_access",
-                            {
-                                "enabled": not bool(row.get("enabled")),
-                                "channel": row.get("channel", ""),
-                                "resource": row.get("resource", ""),
-                                "user": row.get("user", ""),
-                            },
+                            payload,
                         ):
                             st.success("Updated successfully!")
                             time.sleep(2)
@@ -673,20 +679,23 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
 
                     # Handle actions
                     if delete_submitted:
+                        print("payload")
+
                         if row.get("type") == "group":
                             payload = {
                                 "channel": row.get("channel", ""),
                                 "resource": row.get("resource", ""),
                                 "user_id": "",
-                                "group": row.get("user", ""),
+                                "group": row.get("entity", ""),
                             }
                         else:
                             payload = {
                                 "channel": row.get("channel", ""),
                                 "resource": row.get("resource", ""),
-                                "user_id": row.get("user", ""),
+                                "user_id": row.get("entity", ""),
                                 "group": "",
                             }
+
                         if call_action_walker_exec(
                             agent_id, module_root, "delete_permission", payload
                         ):
@@ -695,7 +704,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                                 st.session_state.df_permissions.drop(idx)
                             )
                             st.success(
-                                f"Deleted permission for {row.get('user', 'user')}!"
+                                f"Permission sucessfully removed!"
                             )
                             time.sleep(2)
                             st.rerun()
