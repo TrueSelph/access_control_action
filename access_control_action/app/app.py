@@ -371,11 +371,12 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
         # Channel selection
         channels = call_action_walker_exec(agent_id, module_root, "get_channels", {})
         if channels:
-            channel = st.selectbox("Channels", channels, key=f"{model_key}_select_channels")
+            channel = st.selectbox(
+                "Channels", channels, key=f"{model_key}_select_channels"
+            )
         else:
             channel = ""
             st.warning("Channels not found")
-
 
         # Resource selection
         resources = call_action_walker_exec(agent_id, module_root, "get_resources", {})
@@ -388,7 +389,9 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             st.warning("Resources not found")
 
         # group selection
-        groups_result = call_action_walker_exec(agent_id, module_root, "get_groups", {"include_users": True})
+        groups_result = call_action_walker_exec(
+            agent_id, module_root, "get_groups", {"include_users": True}
+        )
         if groups_result:
             groups = list(groups_result.keys())
         else:
@@ -400,7 +403,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
         if users:
             users_ids = [user["user_id"] for user in users]
             groups.extend(users_ids)
-        
+
         if groups:
             user_id = st.selectbox(
                 "Entity", groups, key=f"{model_key}_select_groups_and_users"
@@ -427,7 +430,6 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             if result:
                 allow_list = result.get("allow", [])
                 deny_list = result.get("deny", [])
-
 
                 allow_list_formatted = []
                 deny_list_formatted = []
@@ -474,7 +476,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                             "resource": resource,
                             "allow": access == "allow",
                             "entity": user_id,
-                            "is_group": user_id in groups_result
+                            "is_group": user_id in groups_result,
                         },
                     )
 
@@ -496,7 +498,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                         "resource": resource,
                         "allow": access == "allow",
                         "entity": user_id,
-                        "is_group": user_id in groups_result
+                        "is_group": user_id in groups_result,
                     },
                 )
 
@@ -545,7 +547,6 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                             }
                         )
 
-
             # Initialize session state with proper column handling
             columns = ["enabled", "channel", "resource", "permission", "entity", "type"]
             # Create empty DataFrame with all columns if no permissions exist
@@ -554,7 +555,13 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             )
 
             # Ensure all columns exist in session state
-            required_columns = ["enabled", "channel", "resource", "permission", "entity"]
+            required_columns = [
+                "enabled",
+                "channel",
+                "resource",
+                "permission",
+                "entity",
+            ]
             for col in required_columns:
                 if col not in st.session_state.df_permissions:
                     st.session_state.df_permissions[col] = (
@@ -598,7 +605,9 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
 
             if user_filter and "entity" in filtered_df:
                 filtered_df = filtered_df[
-                    filtered_df["entity"].str.contains(user_filter, case=False, na=False)
+                    filtered_df["entity"].str.contains(
+                        user_filter, case=False, na=False
+                    )
                 ]
 
             if permission_filter != "All" and "permission" in filtered_df:
@@ -657,7 +666,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
 
                     # Submit button for the form
                     if enable_submitted:
-                        
+
                         if row.get("type") == "group":
                             payload = {
                                 "enabled": not bool(row.get("enabled")),
@@ -689,7 +698,6 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
 
                     # Handle actions
                     if delete_submitted:
-                        print("payload")
 
                         if row.get("type") == "group":
                             payload = {
@@ -713,9 +721,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                             st.session_state.df_permissions = (
                                 st.session_state.df_permissions.drop(idx)
                             )
-                            st.success(
-                                f"Permission sucessfully removed!"
-                            )
+                            st.success("Permission successfully removed!")
                             time.sleep(2)
                             st.rerun()
                         else:

@@ -184,7 +184,7 @@ node AccessControlAction :Action: {
     can add_session_group(group_name:str, session_ids:list) {
         # adds a session group to the session_groups dict
         _group = self.add_group(name=group_name);
-        # create permissions 
+        # create permissions
         users = self.init_permissions().users;
 
         for session_id in session_ids {
@@ -279,7 +279,7 @@ node AccessControlAction :Action: {
     }
 
     can import_permissions(permissions:dict={}, session_groups:dict={}, purge_collection:bool=True) -> bool {
-        # pruge collection before migration
+        # purge collection before migration
 
         if not permissions {
             return False;
@@ -295,7 +295,7 @@ node AccessControlAction :Action: {
         # get collection
         collection = self.get_collection();
 
-        # create permissions 
+        # create permissions
         result = self.init_permissions();
         groups = result.groups;
         users = result.users;
@@ -435,7 +435,7 @@ node AccessControlAction :Action: {
     can add_permission(channel:str, resource:str, allow:bool, entity:str, is_group:bool=False) -> bool {
         try {
             collection = self.get_collection();
-            # create permissions 
+            # create permissions
             result = self.init_permissions();
             groups = result.groups;
             users = result.users;
@@ -557,7 +557,7 @@ walker _init_permissions {
     has users:Users = None;
     has groups:Groups = None;
     has channels:Channels = None;
-    
+
     can on_collection with Collection entry {
         visit [-->](`?Users) else {
             here ++> Users();
@@ -718,7 +718,7 @@ walker _add_user {
     has access:bool = True;
     has enabled:bool = True;
     has duplicate:list = [];
-    
+
 
     can on_collection with Collection entry {
         visit [-->](`?Users) else {
@@ -1010,9 +1010,6 @@ walker _delete_permission {
 
         parent_edges = [<--];
         children_edges = [-->];
-        print("resources edge");
-        print(parent_edges);
-        print(children_edges);
         if(len(parent_edges) <= 1 and len(children_edges) <= 1) {
             here del <-- [<--](`?Channel)(?name == self.channel);
             self.deleted_nodes.append(here);
@@ -1024,7 +1021,7 @@ walker _delete_permission {
             here del --> [-->](`?Group)(?name == self.group);
             self.deleted.append(here);
         }elif ([-->](`?User)(?user_id == self.user_id)) {
-            here del --> [-->](`?User)(?user_id == self.user_id);   
+            here del --> [-->](`?User)(?user_id == self.user_id);
             self.deleted.append(here);
         }
     }
