@@ -12,7 +12,6 @@ import:jac from actions.jivas.access_control_action.channels { Channels }
 import:jac from actions.jivas.access_control_action.any_channel { AnyChannel }
 import:jac from actions.jivas.access_control_action.default_channel { DefaultChannel }
 import:jac from actions.jivas.access_control_action.resource { Resource }
-import:jac from actions.jivas.access_control_action.resources { Resources }
 import:jac from actions.jivas.access_control_action.any_resource { AnyResource }
 import:jac from actions.jivas.access_control_action.group { Group }
 import:jac from actions.jivas.access_control_action.groups { Groups }
@@ -298,7 +297,6 @@ node AccessControlAction :Action: {
 
         # create permissions 
         result = self.init_permissions();
-        resources = result.resources;
         groups = result.groups;
         users = result.users;
 
@@ -308,7 +306,7 @@ node AccessControlAction :Action: {
             _channel = self.add_channel(name=permission_channel);
 
             for permission_resource in permissions[permission_channel] {
-                _resource = self.add_resource(name=permission_resource, resources=resources, channel=_channel);
+                _resource = self.add_resource(name=permission_resource, channel=_channel);
                 # get allow and deny permissions
                 permission_resource_allow = list(permissions[permission_channel][permission_resource]["allow"]);
                 permission_resource_deny = list(permissions[permission_channel][permission_resource]["deny"]);
@@ -383,9 +381,9 @@ node AccessControlAction :Action: {
         return (collection spawn _add_channel(name=name)).channel;
     }
 
-    can add_resource(name:str, resources:Resources = None, channel:Channel = None) -> dict {
+    can add_resource(name:str, channel:Channel = None) -> dict {
         if(channel) {
-            return (channel spawn _add_resource(name=name, resources=resources)).resource;
+            return (channel spawn _add_resource(name=name)).resource;
         } else {
             collection = self.get_collection();
             return (collection spawn _add_resource(name=name)).resource;
@@ -397,7 +395,7 @@ node AccessControlAction :Action: {
         if len(group) > 0 {
             group = list(group.values())[0];
             if(resource) {
-                return (resource spawn _add_group(group=group, access=access, enabled=enabled)).group;
+                return (resource spawn _add_group(name=name, group=group, access=access, enabled=enabled)).group;
             }else {
                 return group;
             }
@@ -416,7 +414,7 @@ node AccessControlAction :Action: {
         if len(user) > 0 {
             user = user[0];
             if group {
-                return (group spawn _add_user(user=user)).user;
+                return (group spawn _add_user(user=user, user_id=user_id)).user;
             }elif(resource) {
                 return (resource spawn _add_user(user=user, access=access, enabled=enabled)).user;
             }else {
@@ -439,13 +437,12 @@ node AccessControlAction :Action: {
             collection = self.get_collection();
             # create permissions 
             result = self.init_permissions();
-            resources = result.resources;
             groups = result.groups;
             users = result.users;
 
 
             _channel = self.add_channel(name=channel);
-            _resource = self.add_resource(name=resource, resources=resources, channel=_channel);
+            _resource = self.add_resource(name=resource, channel=_channel);
 
             if allow {
                 if ( is_group ) {
@@ -501,6 +498,11 @@ node AccessControlAction :Action: {
         return (collection spawn _delete_user(user_id=user_id, group=group)).deleted;
     }
 
+    can remove_user(user_id:str="", group:str="") -> bool {
+        collection = self.get_collection();
+        return (collection spawn _remove_user(user_id=user_id, group=group)).deleted;
+    }
+
     can delete_permission(channel:str="", resource:str="", group:str="", user_id:str="") -> bool {
         collection = self.get_collection();
         return (collection spawn _delete_permission(channel=channel, resource=resource, group=group, user_id=user_id)).deleted;
@@ -508,7 +510,7 @@ node AccessControlAction :Action: {
 
     can get_interact_actions -> list[str] {
         action_nodes = self.get_agent().get_actions().get_all(only_interact_actions=True);
-        actions = ["any", "all"];
+        actions = ["any"];
 
         for action_node in action_nodes {
             actions.append(action_node.get_type());
@@ -555,7 +557,6 @@ walker _init_permissions {
     has users:Users = None;
     has groups:Groups = None;
     has channels:Channels = None;
-    has resources:Resources = None;
     
     can on_collection with Collection entry {
         visit [-->](`?Users) else {
@@ -572,11 +573,6 @@ walker _init_permissions {
             here ++> Channels();
             visit [-->](`?Channels);
         }
-
-        visit [-->](`?Resources) else {
-            here ++> Resources();
-            visit [-->](`?Resources);
-        }
     }
 
     can on_users with Users entry {
@@ -589,10 +585,6 @@ walker _init_permissions {
 
     can on_channels with Channels entry {
         self.channels = here;
-    }
-
-    can on_resources with Resources entry {
-        self.resources = here;
     }
 
 }
@@ -628,34 +620,14 @@ walker _add_channel {
 walker _add_resource {
     has name:str = "";
     has resource:Resource = None;
-    has resources:Resources = None;
     has is_new:bool = False;
 
-
-    can on_collection with Collection entry {
-        visit [-->](`?Resources) else {
-            here ++> Resources();
-            visit [-->](`?Resources);
-        }
-    }
-
-    can on_resources with Resources entry {
-        visit [-->](`?Resource)(?name == self.name) else {
-            self.is_new = True;
-            if self.name in ["any", "all"] {
-                here ++> AnyResource(name=self.name);
-            } else {
-                here ++> Resource(name=self.name);
-            }
-            visit [-->](`?Resource)(?name == self.name);
-        };
-    }
 
 
     can on_channel with Channel entry {
         visit [-->](`?Resource)(?name == self.name) else {
             self.is_new = True;
-            if self.name in ["any", "all"] {
+            if self.name in ["any"] {
                 here ++> AnyResource(name=self.name);
             } else {
                 here ++> Resource(name=self.name);
@@ -666,13 +638,6 @@ walker _add_resource {
 
     can on_resource with Resource entry {
         self.resource = here;
-    }
-
-
-    can on_exit with exit {
-        if self.is_new and self.resources {
-           self.resources ++> self.resource;
-        }
     }
 }
 
@@ -694,7 +659,7 @@ walker _add_group {
     can on_groups with Groups entry {
         visit [-->](`?Group)(?name == self.name) else {
             self.is_new = True;
-            if self.name in ["any", "all"] {
+            if self.name in ["any"] {
                 here ++> AnyGroup(name=self.name);
             } else {
                 here ++> Group(name=self.name);
@@ -715,14 +680,14 @@ walker _add_group {
             }else {
                 self.is_new = True;
                 if self.access{
-                    if self.name in ["any", "all"] {
+                    if self.name in ["any"] {
                         here +:Allow:enabled=self.enabled:+> AnyGroup(name=self.name);
                     } else {
                         here +:Allow:enabled=self.enabled:+> Group(name=self.name);
                     }
                     visit [-:Allow:->](`?Group)(?name == self.name);
                 }else{
-                    if self.name in ["any", "all"] {
+                    if self.name in ["any"] {
                         here +:Deny:enabled=self.enabled:+> AnyGroup(name=self.name);
                     } else {
                         here +:Deny:enabled=self.enabled:+> Group(name=self.name);
@@ -765,7 +730,7 @@ walker _add_user {
     can on_users with Users entry {
         visit [-->](`?User)(?user_id == self.user_id) else {
             self.is_new = True;
-            if self.user_id in ["any", "all"] {
+            if self.user_id in ["all"] {
                 here ++> AnyUser(user_id=self.user_id);
             } else {
                 here ++> User(user_id=self.user_id);
@@ -786,14 +751,14 @@ walker _add_user {
             }else {
                 self.is_new = True;
                 if self.access{
-                    if self.user_id in ["any", "all"] {
+                    if self.user_id in ["all"] {
                         here +:Allow:enabled=self.enabled:+> AnyUser(user_id=self.user_id);
                     } else {
                         here +:Allow:enabled=self.enabled:+> User(user_id=self.user_id);
                     }
                     visit [-:Allow:->](`?User)(?user_id == self.user_id);
                 }else{
-                    if self.user_id in ["any", "all"] {
+                    if self.user_id in ["all"] {
                         here +:Deny:enabled=self.enabled:+> AnyUser(user_id=self.user_id);
                     } else {
                         here +:Deny:enabled=self.enabled:+> User(user_id=self.user_id);
@@ -810,7 +775,7 @@ walker _add_user {
                 here ++> self.user;
             }else {
                 self.is_new = True;
-                if self.user_id in ["any", "all"] {
+                if self.user_id in ["all"] {
                     here ++> AnyUser(user_id=self.user_id);
                 } else {
                     here ++> User(user_id=self.user_id);
@@ -889,11 +854,7 @@ walker _delete_resource {
     has deleted:list = [];
 
     can on_collection with Collection entry {
-        if self.channel {
-            visit [-->](`?Channels);
-        }else {
-            visit [-->](`?Resources);
-        }
+        visit [-->](`?Channels);
     }
 
     can on_channels with Channels entry {
@@ -905,14 +866,6 @@ walker _delete_resource {
     }
 
     can on_channel with Channel entry {
-        if self.resource {
-            visit [-->](`?Resource)(?name == self.resource);
-        } else {
-            visit [-->](`?Resource);
-        }
-    }
-
-    can on_resources with Resources entry {
         if self.resource {
             visit [-->](`?Resource)(?name == self.resource);
         } else {
@@ -1012,12 +965,34 @@ walker _delete_user {
     }
 }
 
+walker _remove_user {
+    has user_id:str = "";
+    has deleted:bool = False;
+    has group:str = "";
+
+    can on_collection with Collection entry {
+        self.collection = here;
+        visit [-->](`?Groups);
+    }
+
+    can on_groups with Groups entry {
+        visit [-->](`?Group)(?name == self.group);
+    }
+
+    can on_group with Group entry {
+        here del --> [-->](`?User)(?user_id == self.user_id);
+        self.deleted = True;
+    }
+}
+
+
 walker _delete_permission {
     has channel:str = "";
     has resource:str = "";
     has group:str = "";
     has user_id:str = "";
     has deleted:list = [];
+    has deleted_nodes:list = [];
 
     can on_collection with Collection entry {
         visit [-->](`?Channels);
@@ -1034,9 +1009,13 @@ walker _delete_permission {
     can on_resource with Resource entry {
 
         parent_edges = [<--];
-        children_edges = [<--];
-        if(len(parent_edges) <= 2 and len(children_edges) <= 1) {
+        children_edges = [-->];
+        print("resources edge");
+        print(parent_edges);
+        print(children_edges);
+        if(len(parent_edges) <= 1 and len(children_edges) <= 1) {
             here del <-- [<--](`?Channel)(?name == self.channel);
+            self.deleted_nodes.append(here);
             self.deleted.append(here);
 
         }
@@ -1048,9 +1027,12 @@ walker _delete_permission {
             here del --> [-->](`?User)(?user_id == self.user_id);   
             self.deleted.append(here);
         }
+    }
 
-        print("self.deleted");
-        print(self.deleted);
+    can on_exit with exit {
+        for item in self.deleted_nodes {
+            Jac.destroy(item);
+        }
     }
 
 }
@@ -1075,10 +1057,14 @@ walker _get_resources {
     has resources:list = [];
 
     can on_collection with Collection entry {
-        visit [-->](`?Resources);
+        visit [-->](`?Channels);
     }
 
-    can on_resources with Resources entry {
+    can on_channels with Channels entry {
+        visit [-->](`?Channel);
+    }
+
+    can on_channel with Channel entry {
         visit [-->](`?Resource);
     }
 

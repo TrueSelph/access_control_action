@@ -344,7 +344,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                                     result = call_action_walker_exec(
                                         agent_id,
                                         module_root,
-                                        "delete_user",
+                                        "remove_user",
                                         {"group": group_name, "user_id": user},
                                     )
 
@@ -409,14 +409,6 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             user_id = ""
             st.warning("Groups and Users not found")
 
-        # select inputs
-        # channel = st.selectbox("Channels", channels, key=f"{model_key}_select_channels")
-        # resource = st.selectbox(
-        #     "Resource", resources, key=f"{model_key}_select_resources"
-        # )
-        # user_id = st.selectbox(
-        #     "Groups and Users", groups, key=f"{model_key}_select_groups_and_users"
-        # )
         access = st.selectbox(
             "Access", ["allow", "deny"], key=f"{model_key}_select_access"
         )
@@ -494,6 +486,24 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                     time.sleep(2)
                     st.rerun()
 
+            else:
+                access_result = call_action_walker_exec(
+                    agent_id,
+                    module_root,
+                    "add_permission",
+                    {
+                        "channel": channel,
+                        "resource": resource,
+                        "allow": access == "allow",
+                        "entity": user_id,
+                        "is_group": user_id in groups_result
+                    },
+                )
+
+                if access_result:
+                    st.success("Update successfully")
+                else:
+                    st.error("Failed to update permissions")
     with st.expander("Permissions", True):
         # Initialize and fetch permissions
         if permissions := call_action_walker_exec(
