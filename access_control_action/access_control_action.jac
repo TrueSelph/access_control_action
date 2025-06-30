@@ -659,7 +659,7 @@ walker _add_group {
     can on_groups with Groups entry {
         visit [-->](`?Group)(?name == self.name) else {
             self.is_new = True;
-            if self.name in ["any"] {
+            if self.name in ["all"] {
                 here ++> AnyGroup(name=self.name);
             } else {
                 here ++> Group(name=self.name);
@@ -680,14 +680,14 @@ walker _add_group {
             }else {
                 self.is_new = True;
                 if self.access{
-                    if self.name in ["any"] {
+                    if self.name in ["all"] {
                         here +:Allow:enabled=self.enabled:+> AnyGroup(name=self.name);
                     } else {
                         here +:Allow:enabled=self.enabled:+> Group(name=self.name);
                     }
                     visit [-:Allow:->](`?Group)(?name == self.name);
                 }else{
-                    if self.name in ["any"] {
+                    if self.name in ["all"] {
                         here +:Deny:enabled=self.enabled:+> AnyGroup(name=self.name);
                     } else {
                         here +:Deny:enabled=self.enabled:+> Group(name=self.name);
