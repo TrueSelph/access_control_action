@@ -13,7 +13,7 @@ Allows access control permissions to be defined per action and user `(by session
 - **Name:** jivas/access_control_action
 - **Author:** V75 Inc.
 - **Architype:** AccessControlAction
-- **Version:** 0.0.1
+- **Version:** 0.1.0
 
 ## Meta Information
 
@@ -27,7 +27,7 @@ Allows access control permissions to be defined per action and user `(by session
 
 ## Dependencies
 
-- **Jivas:** `^2.0.0`
+- **Jivas:** `^2.1.0`
 
 This package enables granular control over permissions for actions performed by users within the system. Permissions can be finely tuned based on specific session IDs or logically-defined groups of sessions. It maintains permission configurations and roles tied explicitly to each user session. The action type is configured as a singleton, ensuring only one active instance exists at any given time to guarantee consistency in permission checks throughout the platform.
 
