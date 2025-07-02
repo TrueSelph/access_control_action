@@ -1,19 +1,20 @@
-include:jac access_control_action;
-include:jac import_permissions;
-include:jac export_permissions;
-include:jac add_permission;
-include:jac delete_permission;
-include:jac get_resources;
-include:jac get_channels;
-include:jac get_groups;
-include:jac get_access;
-include:jac get_users;
-include:jac add_group;
-include:jac add_user;
-include:jac delete_group;
-include:jac delete_user;
-include:jac remove_user;
-include:jac add_channel;
-include:jac add_session_group;
-include:jac enable_access;
-
+import from actions.jivas.access_control_action {
+    access_control_action,
+    import_permissions,
+    export_permissions,
+    add_permission,
+    delete_permission,
+    get_resources,
+    get_channels,
+    get_groups,
+    get_access,
+    get_users,
+    add_group,
+    add_user,
+    delete_group,
+    delete_user,
+    remove_user,
+    add_channel,
+    add_session_group,
+    enable_access
+}
