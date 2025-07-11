@@ -3,10 +3,10 @@ import from logging { Logger }
 import from jivas.agent.core.agent { Agent }
 import from jivas.agent.action.action { Action }
 import from jivas.agent.action.actions { Actions }
-import from jivas.agent.action.interact_graph_walker { interact_graph_walker }
+import from jivas.agent.action.agent_graph_walker { agent_graph_walker }
 
 
-walker add_channel(interact_graph_walker) {
+walker add_channel(agent_graph_walker) {
 
     has name:str = "";
     has response:bool = False;

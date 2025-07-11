@@ -293,6 +293,7 @@ node AccessControlAction(Action) {
             self.get_agent().get_memory().purge_collection_memory(self.label);
         }
 
+
         # get collection
         collection = self.get_collection();
 
@@ -337,6 +338,7 @@ node AccessControlAction(Action) {
             }
         }
 
+
         # add user to group
         for session_group in session_groups {
             self.add_session_group(group_name=session_group, session_ids=session_groups[session_group]);
@@ -377,6 +379,7 @@ node AccessControlAction(Action) {
         collection = self.get_collection();
         return (collection spawn _init_permissions());
     }
+
     def add_channel(name:str) -> dict {
         collection = self.get_collection();
         return (collection spawn _add_channel(name=name)).channel;
