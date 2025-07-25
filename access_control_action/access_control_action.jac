@@ -562,6 +562,10 @@ walker _init_permissions {
     has groups:Groups = None;
     has channels:Channels = None;
 
+    obj __specs__ {
+        static has private: bool = True;
+    }
+
     can on_collection with Collection entry {
         visit [-->](`?Users) else {
             here ++> Users();
@@ -597,6 +601,9 @@ walker _add_channel {
     has name:str = "";
     has channel:Channel = None;
 
+    obj __specs__ {
+        static has private: bool = True;
+    }
 
     can on_collection with Collection entry {
         visit [-->](`?Channels) else {
@@ -626,7 +633,9 @@ walker _add_resource {
     has resource:Resource = None;
     has is_new:bool = False;
 
-
+    obj __specs__ {
+        static has private: bool = True;
+    }
 
     can on_channel with Channel entry {
         visit [-->](`?Resource)(?name == self.name) else {
@@ -652,6 +661,10 @@ walker _add_group {
     has is_new:bool = False;
     has access:bool = True;
     has enabled:bool = True;
+
+    obj __specs__ {
+        static has private: bool = True;
+    }
 
     can on_collection with Collection entry {
         visit [-->](`?Groups) else {
@@ -723,6 +736,9 @@ walker _add_user {
     has enabled:bool = True;
     has duplicate:list = [];
 
+    obj __specs__ {
+        static has private: bool = True;
+    }
 
     can on_collection with Collection entry {
         visit [-->](`?Users) else {
@@ -804,6 +820,10 @@ walker _delete_channel {
     has name:str = "";
     has deleted:list = [];
 
+    obj __specs__ {
+        static has private: bool = True;
+    }
+
     can on_collection with Collection entry {
         visit [-->](`?Channels);
     }
@@ -857,6 +877,10 @@ walker _delete_resource {
     has resource:str = "";
     has deleted:list = [];
 
+    obj __specs__ {
+        static has private: bool = True;
+    }
+
     can on_collection with Collection entry {
         visit [-->](`?Channels);
     }
@@ -908,6 +932,10 @@ walker _delete_group {
     has name:str = "";
     has deleted:list = [];
 
+    obj __specs__ {
+        static has private: bool = True;
+    }
+
     can on_collection with Collection entry {
         visit [-->](`?Groups);
     }
@@ -943,6 +971,10 @@ walker _delete_user {
     has collection:Collection = None;
     has edge_deleted:bool = False;
 
+    obj __specs__ {
+        static has private: bool = True;
+    }
+
     can on_collection with Collection entry {
         self.collection = here;
         visit [-->](`?Users);
@@ -974,6 +1006,10 @@ walker _remove_user {
     has deleted:bool = False;
     has group:str = "";
 
+    obj __specs__ {
+        static has private: bool = True;
+    }
+
     can on_collection with Collection entry {
         self.collection = here;
         visit [-->](`?Groups);
@@ -997,6 +1033,10 @@ walker _delete_permission {
     has user_id:str = "";
     has deleted:list = [];
     has deleted_nodes:list = [];
+
+    obj __specs__ {
+        static has private: bool = True;
+    }
 
     can on_collection with Collection entry {
         visit [-->](`?Channels);
@@ -1041,6 +1081,10 @@ walker _delete_permission {
 walker _get_channels {
     has channels:list = [];
 
+    obj __specs__ {
+        static has private: bool = True;
+    }
+
     can on_collection with Collection entry {
         visit [-->](`?Channels);
     }
@@ -1056,6 +1100,10 @@ walker _get_channels {
 
 walker _get_resources {
     has resources:list = [];
+
+    obj __specs__ {
+        static has private: bool = True;
+    }
 
     can on_collection with Collection entry {
         visit [-->](`?Channels);
@@ -1078,6 +1126,10 @@ walker _get_groups {
     has groups:dict = {};
     has group:str = "";
     has include_users:bool = False;
+
+    obj __specs__ {
+        static has private: bool = True;
+    }
 
     can on_collection with Collection entry {
         visit [-->](`?Groups);
@@ -1111,6 +1163,10 @@ walker _get_users {
     has user_id:str = "";
     has out_of_groups:bool = False;
 
+    obj __specs__ {
+        static has private: bool = True;
+    }
+
     can on_collection with Collection entry {
         visit [-->](`?Users);
     }
@@ -1139,6 +1195,10 @@ walker _get_access {
     has channel:str = "default";
     has resource:str = "any";
     has access:dict = {};
+
+    obj __specs__ {
+        static has private: bool = True;
+    }
 
     obj __specs__ {
         static has private:bool = True;
@@ -1184,6 +1244,10 @@ walker _get_access {
 walker _export_permissions {
     has permissions:dict = {};
     has session_groups:dict = {};
+
+    obj __specs__ {
+        static has private: bool = True;
+    }
 
     can on_collection with Collection entry {
         visit [-->];
@@ -1271,6 +1335,10 @@ walker _has_access {
     has user_id:str = "all";
     has access:bool = False;
     has denied_groups:list = [];
+
+    obj __specs__ {
+        static has private: bool = True;
+    }
 
     obj __specs__ {
         static has private:bool = True;
