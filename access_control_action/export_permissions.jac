@@ -35,7 +35,7 @@ walker export_permissions(agent_graph_walker) {
             "permissions": response.permissions,
             "session_groups": response.session_groups
         };
-        
+
         if self.reporting {
             report self.response;
         }
