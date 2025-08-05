@@ -7,7 +7,7 @@ from contextlib import suppress
 import pandas as pd
 import streamlit as st
 import yaml
-from jvclient.lib.utils import call_action_walker_exec
+from jvclient.lib.utils import call_api, get_reports_payload
 from jvclient.lib.widgets import app_controls, app_header, app_update_action
 from streamlit_router import StreamlitRouter
 
@@ -38,19 +38,20 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             disabled=(not agent_id),
         ):
             # Call the function to purge
-            if result := call_action_walker_exec(
-                agent_id, module_root, "export_permissions", {}
+            if result := call_api(
+                endpoint="action/walker/access_control_action/export_permissions",
+                json_data={"agent_id": agent_id},
             ):
                 st.success("Export permissions successfully")
-                if result:
-                    result = json.dumps(result, indent=2)
-                    st.write(result)
+                if result and result.status_code == 200:
+                    report_result = get_reports_payload(result)
                     st.download_button(
                         label="Download Exported Permissions",
-                        data=result,
+                        data=json.dumps(report_result, indent=2),
                         file_name="exported_permissions.json",
                         mime="application/json",
                     )
+                    st.json(report_result)
             else:
                 st.error(
                     "Failed to export permissions. Ensure that there is something to export"
@@ -120,11 +121,10 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                     else:
                         permissions = data_to_import
 
-                    result = call_action_walker_exec(
-                        agent_id,
-                        module_root,
-                        "import_permissions",
-                        {
+                    result = call_api(
+                        endpoint="action/walker/access_control_action/import_permissions",
+                        json_data={
+                            "agent_id": agent_id,
                             "permissions": permissions,
                             "session_groups": session_groups,
                             "purge_collection": purge_collection,
@@ -150,8 +150,9 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             if st.button(
                 "Add User", key=f"{model_key}_btn_add_user", disabled=(not agent_id)
             ):
-                if result := call_action_walker_exec(
-                    agent_id, module_root, "add_user", {"user_id": user_id}
+                if result := call_api(
+                    endpoint="action/walker/access_control_action/add_user",
+                    json_data={"agent_id": agent_id, "user_id": user_id},
                 ):
                     st.success("User added successfully")
                 else:
@@ -183,39 +184,41 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                 unsafe_allow_html=True,
             )
 
-            if result := call_action_walker_exec(
-                agent_id, module_root, "get_users", {}
+            if result := call_api(
+                endpoint="action/walker/access_control_action/get_users",
+                json_data={"agent_id": agent_id},
             ):
+                result = get_reports_payload(result)
                 for user in result:
                     # Create a container for each row with custom class
                     with st.container():
                         # Add custom class to the container
                         st.markdown('<div class="slim-row">', unsafe_allow_html=True)
 
+                        user_id = user['context']['user_id']
+
                         cols = st.columns([4, 1])
                         with cols[0]:
-                            st.markdown(f"**{user['user_id']}**")
+                            st.markdown(f"**{user_id}**")
 
                         with cols[1]:
                             if st.button(
                                 "Delete",
-                                key=f"{model_key}_{user['user_id']}_btn_delete_user",
+                                key=f"{model_key}_{user_id}_btn_delete_user",
                                 disabled=(not agent_id),
                                 # Use compact button style
                                 use_container_width=True,
                             ):
-                                if result := call_action_walker_exec(
-                                    agent_id,
-                                    module_root,
-                                    "delete_user",
-                                    {"user_id": user["user_id"]},
+                                if result := call_api(
+                                    endpoint="action/walker/access_control_action/delete_user",
+                                    json_data={"agent_id": agent_id, "user_id": user_id},
                                 ):
                                     st.success(
-                                        f"User {user['user_id']} removed successfully"
+                                        f"User {user_id} removed successfully"
                                     )
                                 else:
                                     st.error(
-                                        f"Failed to remove user '{user['user_id']}'"
+                                        f"Failed to remove user '{user_id}'"
                                     )
 
                                 time.sleep(2)
@@ -235,8 +238,9 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             new_group = st.text_input("Enter Group", key=f"{model_key}_input_group")
             if st.button("Add Group", key=f"{model_key}_btn_add_group"):
                 # Call the function to purge
-                if result := call_action_walker_exec(
-                    agent_id, module_root, "add_group", {"name": new_group}
+                if result := call_api(
+                    endpoint="action/walker/access_control_action/add_group",
+                    json_data={"agent_id": agent_id, "name": new_group},
                 ):
                     st.success("Group added successfully")
                 else:
@@ -246,17 +250,29 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                 st.rerun()
 
         with add_session_group_tab:
-            groups_result = call_action_walker_exec(
-                agent_id, module_root, "get_groups", {"include_users": True}
+            groups_result = {} 
+            groups_result_ = call_api(
+                endpoint="action/walker/access_control_action/get_groups",
+                json_data={"agent_id": agent_id, "include_users": True},
             )
-            users = call_action_walker_exec(agent_id, module_root, "get_users", {})
+            if groups_result_ and groups_result_.status_code == 200:
+                groups_result = get_reports_payload(groups_result_)
+
+
+            users_result_ = call_api(
+                endpoint="action/walker/access_control_action/get_users", 
+                json_data={"agent_id": agent_id}
+            )
+            users = []
+            if users_result_ and users_result_.status_code == 200:
+                users = get_reports_payload(users_result_)
 
             if groups_result:
                 groups = groups_result.keys()
             else:
                 groups = []
 
-            users = [user["user_id"] for user in users]
+            users = [user["context"]["user_id"] for user in users]
             if not groups:
                 st.error("Failed to get groups.")
 
@@ -270,11 +286,9 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
 
             if st.button("Add User to Group", key=f"{model_key}_btn_add_session_group"):
                 # Call the function to purge
-                if result := call_action_walker_exec(
-                    agent_id,
-                    module_root,
-                    "add_session_group",
-                    {"group": group, "user_id": user_id},
+                if result := call_api(
+                    endpoint="action/walker/access_control_action/add_session_group",
+                    json_data={"agent_id": agent_id, "user_id": user_id, "group": group},
                 ):
                     st.success("Group added successfully")
                 else:
@@ -299,11 +313,9 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                             disabled=(not agent_id),
                             use_container_width=True,
                         ):
-                            result = call_action_walker_exec(
-                                agent_id,
-                                module_root,
-                                "delete_group",
-                                {"name": group_name},
+                            result = call_api(
+                                endpoint="action/walker/access_control_action/delete_group",
+                                json_data={"agent_id": agent_id, "name": group_name},
                             )
                             if result:
                                 st.success(f"Group {group_name} removed successfully")
@@ -341,11 +353,13 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                                     use_container_width=True,
                                     help=f"Remove {user} from {group_name}",
                                 ):
-                                    result = call_action_walker_exec(
-                                        agent_id,
-                                        module_root,
-                                        "remove_user",
-                                        {"group": group_name, "user_id": user},
+                                    result = call_api(
+                                        endpoint="action/walker/access_control_action/remove_user",
+                                        json_data={
+                                            "agent_id": agent_id,
+                                            "group": group_name,
+                                            "user_id": user,
+                                        },
                                     )
 
                                     if result:
@@ -369,7 +383,15 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
     with st.expander("Manage Permissions", expanded=False):
         st.subheader("Add Permissions")
         # Channel selection
-        channels = call_action_walker_exec(agent_id, module_root, "get_channels", {})
+        channels = []
+        channels_result_ = call_api(
+            endpoint="action/walker/access_control_action/get_channels",
+            json_data={"agent_id": agent_id})
+        
+        if channels_result_ and channels_result_.status_code == 200:
+            channels = get_reports_payload(channels_result_)
+
+
         if channels:
             channel = st.selectbox(
                 "Channels", channels, key=f"{model_key}_select_channels"
@@ -379,7 +401,11 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             st.warning("Channels not found")
 
         # Resource selection
-        resources = call_action_walker_exec(agent_id, module_root, "get_resources", {})
+        resources = []
+        resources_result_ = call_api(endpoint="action/walker/access_control_action/get_resources", json_data={"agent_id": agent_id})
+        if resources_result_ and resources_result_.status_code == 200:
+            resources = get_reports_payload(resources_result_)
+
         if resources:
             resource = st.selectbox(
                 "Resource", resources, key=f"{model_key}_select_resources"
@@ -389,9 +415,14 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             st.warning("Resources not found")
 
         # group selection
-        groups_result = call_action_walker_exec(
-            agent_id, module_root, "get_groups", {"include_users": True}
+        groups_result = {}
+        groups_result_ = call_api(
+            endpoint="action/walker/access_control_action/get_groups",
+            json_data={"agent_id": agent_id, "include_users": True},
         )
+        if groups_result_ and groups_result_.status_code == 200:
+            groups_result = get_reports_payload(groups_result_)
+
         if groups_result:
             groups = list(groups_result.keys())
         else:
@@ -399,9 +430,13 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             st.warning("Groups not found")
 
         # user selection
-        users = call_action_walker_exec(agent_id, module_root, "get_users", {})
+        users = []
+        users_result_ = call_api(endpoint="action/walker/access_control_action/get_users", json_data={"agent_id": agent_id})
+        if users_result_ and users_result_.status_code == 200:
+            users = get_reports_payload(users_result_)
+
         if users:
-            users_ids = [user["user_id"] for user in users]
+            users_ids = [user["context"]["user_id"] for user in users]
             groups.extend(users_ids)
 
         if groups:
@@ -420,12 +455,13 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
         if st.button("Add Permission", key=f"{model_key}_btn_add_permission"):
 
             # check if permission is valid before trying to create permission
-            result = call_action_walker_exec(
-                agent_id,
-                module_root,
-                "get_access",
-                {"channel": channel, "resource": resource},
+            result_ = call_api(
+                endpoint="action/walker/access_control_action/get_access",
+                json_data={"agent_id": agent_id, "channel": channel, "resource": resource},
             )
+
+            if result_ and result_.status_code == 200:
+                result = get_reports_payload(result_)
 
             if result:
                 allow_list = result.get("allow", [])
@@ -437,22 +473,22 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                 deny_group = []
 
                 for item in allow_list:
-                    if "user_id" in item:
-                        allow_list_formatted.append(item["user_id"])
+                    if "user_id" in item['context']:
+                        allow_list_formatted.append(item['context']["user_id"])
                     else:
-                        allow_list_formatted.append(item["name"])
+                        allow_list_formatted.append(item['context']["name"])
                         # append group user to allow list
-                        if item["name"] in groups_result:
-                            allow_group.extend(groups_result[item["name"]])
+                        if item['context']["name"] in groups_result:
+                            allow_group.extend(groups_result[item['context']["name"]])
 
                 for item in deny_list:
-                    if "user_id" in item:
-                        deny_list_formatted.append(item["user_id"])
+                    if "user_id" in item['context']:
+                        deny_list_formatted.append(item['context']["user_id"])
                     else:
-                        deny_list_formatted.append(item["name"])
+                        deny_list_formatted.append(item['context']["name"])
                         # append group user to deny list
-                        if item["name"] in groups_result:
-                            deny_group.extend(groups_result[item["name"]])
+                        if item['context']["name"] in groups_result:
+                            deny_group.extend(groups_result[item['context']["name"]])
 
                 if user_id in deny_group:
                     st.error(
@@ -467,11 +503,10 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                 elif user_id in deny_list_formatted:
                     st.error("User already has DENY access to this resource")
                 else:
-                    access_result = call_action_walker_exec(
-                        agent_id,
-                        module_root,
-                        "add_permission",
-                        {
+                    access_result = call_api(
+                        endpoint="action/walker/access_control_action/add_permission",
+                        json_data={
+                            "agent_id": agent_id,
                             "channel": channel,
                             "resource": resource,
                             "allow": access == "allow",
@@ -489,28 +524,30 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                     st.rerun()
 
             else:
-                access_result = call_action_walker_exec(
-                    agent_id,
-                    module_root,
-                    "add_permission",
-                    {
+                access_result = call_api(
+                    endpoint="action/walker/access_control_action/add_permission",
+                    json_data={
+                        "agent_id": agent_id,
                         "channel": channel,
                         "resource": resource,
                         "allow": access == "allow",
                         "entity": user_id,
                         "is_group": user_id in groups_result,
-                    },
+                    }
                 )
 
-                if access_result:
+                if access_result and access_result.status_code == 200:
                     st.success("Update successfully")
                 else:
                     st.error("Failed to update permissions")
+
     with st.expander("Permissions", True):
         # Initialize and fetch permissions
-        if permissions := call_action_walker_exec(
-            agent_id, module_root, "export_permissions", {}
+        if permissions := call_api(
+            endpoint="action/walker/access_control_action/export_permissions", json_data={"agent_id": agent_id}
         ):
+            permissions = permissions.json()
+            permissions = permissions.get("reports", [{}])[0]
 
             # Process permissions data
             formatted_permissions = []
@@ -669,6 +706,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
 
                         if row.get("type") == "group":
                             payload = {
+                                "agent_id": agent_id,
                                 "enabled": not bool(row.get("enabled")),
                                 "channel": row.get("channel", ""),
                                 "resource": row.get("resource", ""),
@@ -677,6 +715,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                             }
                         else:
                             payload = {
+                                "agent_id": agent_id,
                                 "enabled": not bool(row.get("enabled")),
                                 "channel": row.get("channel", ""),
                                 "resource": row.get("resource", ""),
@@ -684,11 +723,9 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                                 "group": "",
                             }
 
-                        if call_action_walker_exec(
-                            agent_id,
-                            module_root,
-                            "enable_access",
-                            payload,
+                        if call_api(
+                            endpoint="action/walker/access_control_action/enable_access",
+                            json_data=payload,
                         ):
                             st.success("Updated successfully!")
                             time.sleep(2)
@@ -701,6 +738,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
 
                         if row.get("type") == "group":
                             payload = {
+                                "agent_id": agent_id,
                                 "channel": row.get("channel", ""),
                                 "resource": row.get("resource", ""),
                                 "user_id": "",
@@ -708,14 +746,15 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                             }
                         else:
                             payload = {
+                                "agent_id": agent_id,
                                 "channel": row.get("channel", ""),
                                 "resource": row.get("resource", ""),
                                 "user_id": row.get("entity", ""),
                                 "group": "",
                             }
 
-                        if call_action_walker_exec(
-                            agent_id, module_root, "delete_permission", payload
+                        if call_api(
+                            endpoint="action/walker/access_control_action/delete_permission", json_data=payload
                         ):
 
                             st.session_state.df_permissions = (

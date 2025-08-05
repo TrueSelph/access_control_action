@@ -1,4 +1,4 @@
-import from jivas.agent.modules.agentlib.utils { Utils }
+import from jivas.agent.modules.system.common { node_obj }
 import from jivas.agent.core.graph_node { GraphNode }
 import from actions.jivas.access_control_action.user { User }
 
@@ -8,7 +8,7 @@ node Group(GraphNode) {
     has name:str = "";
 
     def get_group_entry() {
-        Utils.node_obj([<--]);
+        node_obj([<--]);
     }
 
     def get_name() -> str {
