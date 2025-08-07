@@ -7,13 +7,10 @@ import from jivas.agent.modules.action.path { action_walker_path }
 import from jivas.agent.action.agent_graph_walker { agent_graph_walker }
 
 
-walker delete_permission(agent_graph_walker) {
+walker remove_user(agent_graph_walker) {
 
-
-    has channel:str = "";
-    has resource:str = "";
-    has group:str = "";
     has user_id:str = "";
+    has group:str = "";
     has response:bool = False;
     has reporting:bool = True;
 
@@ -34,7 +31,7 @@ walker delete_permission(agent_graph_walker) {
     }
 
     can on_action with Action entry {
-        self.response = here.delete_permission(channel=self.channel, resource=self.resource, group=self.group, user_id=self.user_id);
+        self.response = here.remove_user(user_id=self.user_id, group=self.group);
         if self.reporting {
             report self.response;
         }

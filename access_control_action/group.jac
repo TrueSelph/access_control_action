@@ -1,25 +1,25 @@
-import:py from jivas.agent.modules.agentlib.utils { Utils }
-import:jac from jivas.agent.core.graph_node { GraphNode }
-import:jac from actions.jivas.access_control_action.user { User }
+import from jivas.agent.modules.system.common { node_obj }
+import from jivas.agent.core.graph_node { GraphNode }
+import from actions.jivas.access_control_action.user { User }
 
 
 
-node Group :GraphNode: {
+node Group(GraphNode) {
     has name:str = "";
 
-    can get_group_entry() {
-        Utils.node_obj([<--]);
+    def get_group_entry() {
+        node_obj([<--]);
     }
 
-    can get_name() -> str {
+    def get_name() -> str {
         return self.name;
     }
 
-    can set_name(name:str) -> None {
+    def set_name(name:str) -> None {
         self.name = name;
     }
 
-    can has_user(user_id:str="all") -> bool {
+    def has_user(user_id:str="all") -> bool {
         return (self spawn _has_user(user_id=user_id)).user;
     }
 }
