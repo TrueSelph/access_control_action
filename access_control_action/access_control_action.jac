@@ -946,15 +946,8 @@ walker _delete_group {
 
     can on_group with Group entry {
         self.deleted.append(here);
-        visit [-->](`?User);
     }
 
-    can on_user with User entry {
-        edges = [<--];
-        if(len(edges) <= 2) {
-            self.deleted.append(here);
-        }
-    }
 
     can on_exit with exit {
         for item in self.deleted {
