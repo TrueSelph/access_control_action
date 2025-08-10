@@ -12,3 +12,6 @@
 
 # 0.1.1
 - Allows group deletion without affecting users
+
+# 0.1.2
+- Version bump
