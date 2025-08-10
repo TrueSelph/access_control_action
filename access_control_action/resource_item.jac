@@ -1,11 +1,11 @@
 import from jivas.agent.modules.system.common { node_obj }
 import from jivas.agent.core.graph_node { GraphNode }
 
-node Resource(GraphNode) {
+node ResourceItem(GraphNode) {
     has name:str = "";
 
     def get_job_entry() {
-        node_obj([<--]);
+        return node_obj([<--]);
     }
 
     def get_name() -> str {

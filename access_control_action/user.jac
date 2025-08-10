@@ -6,7 +6,7 @@ node User(GraphNode) {
     has user_id:str = "";
 
     def get_job_entry() {
-        node_obj([<--]);
+        return node_obj([<--]);
     }
 
     def get_user_id() -> str {
