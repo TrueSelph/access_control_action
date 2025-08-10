@@ -15,3 +15,6 @@
 
 # 0.1.2
 - Version bump
+
+# 0.1.3
+- Bugfix with reserved name 'Resource'

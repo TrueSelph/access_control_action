@@ -11,7 +11,7 @@ import from actions.jivas.access_control_action.channel { Channel }
 import from actions.jivas.access_control_action.channels { Channels }
 import from actions.jivas.access_control_action.any_channel { AnyChannel }
 import from actions.jivas.access_control_action.default_channel { DefaultChannel }
-import from actions.jivas.access_control_action.resource { Resource }
+import from actions.jivas.access_control_action.resource_item { ResourceItem }
 import from actions.jivas.access_control_action.any_resource { AnyResource }
 import from actions.jivas.access_control_action.group { Group }
 import from actions.jivas.access_control_action.groups { Groups }
@@ -394,7 +394,7 @@ node AccessControlAction(Action) {
         }
     }
 
-    def add_group(name:str, access:bool = True, enabled:bool = True, groups:Groups = None, resource:Resource = None) -> dict {
+    def add_group(name:str, access:bool = True, enabled:bool = True, groups:Groups = None, resource:ResourceItem = None) -> dict {
         group = self.get_groups(group=name);
         if len(group) > 0 {
             group = list(group.values())[0];
@@ -413,7 +413,7 @@ node AccessControlAction(Action) {
         }
     }
 
-    def add_user(user_id:str, access:bool = True, enabled:bool = True, users:Users = None, resource:Resource = None, group:Group = None) -> dict {
+    def add_user(user_id:str, access:bool = True, enabled:bool = True, users:Users = None, resource:ResourceItem = None, group:Group = None) -> dict {
         user = self.get_users(user_id=user_id);
         if len(user) > 0 {
             user = user[0];
@@ -630,7 +630,7 @@ walker _add_channel {
 
 walker _add_resource {
     has name:str = "";
-    has resource:Resource = None;
+    has resource:ResourceItem = None;
     has is_new:bool = False;
 
     obj __specs__ {
@@ -638,18 +638,18 @@ walker _add_resource {
     }
 
     can on_channel with Channel entry {
-        visit [-->](`?Resource)(?name == self.name) else {
+        visit [-->](`?ResourceItem)(?name == self.name) else {
             self.is_new = True;
             if self.name in ["any"] {
                 here ++> AnyResource(name=self.name);
             } else {
-                here ++> Resource(name=self.name);
+                here ++> ResourceItem(name=self.name);
             }
-            visit [-->](`?Resource)(?name == self.name);
+            visit [-->](`?ResourceItem)(?name == self.name);
         };
     }
 
-    can on_resource with Resource entry {
+    can on_resource with ResourceItem entry {
         self.resource = here;
     }
 }
@@ -686,7 +686,7 @@ walker _add_group {
     }
 
 
-    can on_resource with Resource entry {
+    can on_resource with ResourceItem entry {
         visit [-->](`?Group)(?name == self.name) else {
             if self.group {
                 if self.access {
@@ -760,7 +760,7 @@ walker _add_user {
     }
 
 
-    can on_resource with Resource entry {
+    can on_resource with ResourceItem entry {
         visit [-->](`?User)(?user_id == self.user_id) else {
             if self.user {
                 if self.access {
@@ -838,10 +838,10 @@ walker _delete_channel {
 
     can on_channel with Channel entry {
         self.deleted.append(here);
-        visit [-->](`?Resource);
+        visit [-->](`?ResourceItem);
     }
 
-    can on_resource with Resource entry {
+    can on_resource with ResourceItem entry {
         self.deleted.append(here);
         edges = [<--];
         if(len(edges) <= 2) {
@@ -895,13 +895,13 @@ walker _delete_resource {
 
     can on_channel with Channel entry {
         if self.resource {
-            visit [-->](`?Resource)(?name == self.resource);
+            visit [-->](`?ResourceItem)(?name == self.resource);
         } else {
-            visit [-->](`?Resource);
+            visit [-->](`?ResourceItem);
         }
     }
 
-    can on_resource with Resource entry {
+    can on_resource with ResourceItem entry {
         self.deleted.append(here);
         visit [-->];
     }
@@ -1040,10 +1040,10 @@ walker _delete_permission {
     }
 
     can on_channel with Channel entry {
-        visit [-->](`?Resource)(?name == self.resource);
+        visit [-->](`?ResourceItem)(?name == self.resource);
     }
 
-    can on_resource with Resource entry {
+    can on_resource with ResourceItem entry {
 
         parent_edges = [<--];
         children_edges = [-->];
@@ -1107,10 +1107,10 @@ walker _get_resources {
     }
 
     can on_channel with Channel entry {
-        visit [-->](`?Resource);
+        visit [-->](`?ResourceItem);
     }
 
-    can on_resource with Resource entry {
+    can on_resource with ResourceItem entry {
         self.resources.append(here);
     }
 }
@@ -1206,10 +1206,10 @@ walker _get_access {
     }
 
     can on_channel with Channel entry {
-        visit [-->](`?Resource)(?name==self.resource);
+        visit [-->](`?ResourceItem)(?name==self.resource);
     }
 
-    can on_resource with Resource entry {
+    can on_resource with ResourceItem entry {
         allow_access = [];
         deny_access = [];
 
@@ -1251,11 +1251,11 @@ walker _export_permissions {
     }
 
     can on_channel with Channel entry {
-        visit [-->](`?Resource);
+        visit [-->](`?ResourceItem);
         self.permissions[here.name] = {};
     }
 
-    can on_resource with Resource entry {
+    can on_resource with ResourceItem entry {
         channel = [<--](`?Channel)[0].name;
 
         allow_list = [];
@@ -1372,12 +1372,12 @@ walker _has_access {
         }
 
 
-        visit [-->](`?Resource)(?name==self.resource) else {
-            visit [-->](`?Resource)(?name=="any");
+        visit [-->](`?ResourceItem)(?name==self.resource) else {
+            visit [-->](`?ResourceItem)(?name=="any");
         }
     }
 
-    can on_resource with Resource entry {
+    can on_resource with ResourceItem entry {
         visit [->:Allow:enabled==True:->](`?User)(?user_id==self.user_id) else {
             visit [->:Allow:enabled==True:->](`?Group);
         }
@@ -1411,12 +1411,12 @@ walker _has_explicit_deny_access {
     }
 
     can on_channel with Channel entry {
-        visit [-->](`?Resource)(?name==self.resource) else {
-            visit [-->](`?Resource)(?name=="any");
+        visit [-->](`?ResourceItem)(?name==self.resource) else {
+            visit [-->](`?ResourceItem)(?name=="any");
         }
     }
 
-    can on_resource with Resource entry {
+    can on_resource with ResourceItem entry {
         visit [->:Deny:enabled==True:->](`?User)(?user_id==self.user_id) else {
             visit [->:Deny:enabled==True:->](`?Group);
         }
@@ -1459,9 +1459,9 @@ walker _enable_access {
         visit [-->](`?Channel)(?name==self.channel);
     }
     can on_channel with Channel entry {
-        visit [-->](`?Resource)(?name==self.resource);
+        visit [-->](`?ResourceItem)(?name==self.resource);
     }
-    can on_resource with Resource entry {
+    can on_resource with ResourceItem entry {
 
 
         if (self.user) {

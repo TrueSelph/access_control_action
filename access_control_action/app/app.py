@@ -401,7 +401,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
             channel = ""
             st.warning("Channels not found")
 
-        # Resource selection
+        # ResourceItem selection
         resources = []
         resources_result_ = call_api(
             endpoint="action/walker/access_control_action/get_resources",
@@ -412,7 +412,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
 
         if resources:
             resource = st.selectbox(
-                "Resource", resources, key=f"{model_key}_select_resources"
+                "ResourceItem", resources, key=f"{model_key}_select_resources"
             )
         else:
             resource = ""
@@ -633,7 +633,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                     )
 
                 resource_filter = st.multiselect(
-                    "Resource:",
+                    "ResourceItem:",
                     options=resource_options,
                     default=[],
                     disabled=len(resource_options) == 0,
@@ -671,7 +671,7 @@ def render(router: StreamlitRouter, agent_id: str, action_id: str, info: dict) -
                 header_labels = [
                     "Enabled",
                     "Channel",
-                    "Resource",
+                    "ResourceItem",
                     "Entity",
                     "Permission",
                     "Delete",
