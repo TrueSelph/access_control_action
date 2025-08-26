@@ -18,3 +18,6 @@
 
 # 0.1.3
 - Bugfix with reserved name 'Resource'
+
+# 0.1.4
+- Added import and export collections

@@ -209,8 +209,10 @@ node AccessControlAction(Action) {
         groups = self.get_groups(include_users=True, group=group_names);
 
         for name in group_names {
-            if(name in groups and session_id in groups[name]) {
-                return True;
+            if group_users := self.get_groups(include_users=True, group=name) {
+                if session_id in group_users.get(name) {
+                    return True;
+                }
             }
         }
 
@@ -552,6 +554,25 @@ node AccessControlAction(Action) {
     def enable_access(user:str, group:str, channel:str, resource:str, enabled:bool=True) -> bool {
         collection = self.get_collection();
         return (collection spawn _enable_access(user=user, group=group, channel=channel, resource=resource, enabled=enabled)).result;
+    }
+
+    def export_collection() -> dict {
+        result = self.export_permissions();
+        return {
+            "permissions": result.permissions,
+            "session_groups": result.session_groups
+        };
+    }
+
+    def import_collection(collection_info:dict, purge_collection:bool=True) -> bool {
+        if collection_info {
+            permissions = collection_info.get("permissions");
+            session_groups = collection_info.get("session_groups");
+
+            self.import_permissions(permissions, session_groups, purge_collection);
+            return True;
+        }
+        return False;
     }
 
 }
