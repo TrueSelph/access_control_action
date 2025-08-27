@@ -564,12 +564,12 @@ node AccessControlAction(Action) {
         };
     }
 
-    def import_collection(collection_info:dict, purge_collection:bool=True) -> bool {
-        if collection_info {
-            permissions = collection_info.get("permissions");
-            session_groups = collection_info.get("session_groups");
+    def import_collection(data:dict, purge:bool=True) -> bool {
+        if data {
+            permissions = data.get("permissions");
+            session_groups = data.get("session_groups");
 
-            self.import_permissions(permissions, session_groups, purge_collection);
+            self.import_permissions(permissions, session_groups, purge);
             return True;
         }
         return False;
