@@ -21,3 +21,4 @@
 
 # 0.1.4
 - Added import and export collections
+- Allow approved WhatsApp numbers with an underscore and trailing digits

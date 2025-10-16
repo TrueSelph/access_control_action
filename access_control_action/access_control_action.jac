@@ -1399,6 +1399,12 @@ walker _has_access {
     }
 
     can on_resource with ResourceItem entry {
+
+        # Allow approved WhatsApp numbers with an underscore and trailing digits
+        # (e.g., 5926431530_3452) to be recognized and processed correctly.
+        if re.match(r"^\d+_\d+$", self.user_id) {
+            self.user_id = self.user_id.split("_")[0];
+        }
         visit [->:Allow:enabled==True:->](`?User)(?user_id==self.user_id) else {
             visit [->:Allow:enabled==True:->](`?Group);
         }
