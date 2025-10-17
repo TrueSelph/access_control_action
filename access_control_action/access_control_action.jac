@@ -1402,11 +1402,11 @@ walker _has_access {
 
         # Allow approved WhatsApp numbers with an underscore and trailing digits
         # (e.g., 5926431530_3452) to be recognized and processed correctly.
-        # if re.match(r"^\d+_[\w-]+$", self.user_id) {
         if (re.match(r"^\+?\d+_[\w-]+$", self.user_id)) or (re.match(r"^\d+_[\w-]+$", self.user_id)) {
             self.user_id = self.user_id.split("_")[0];
             self.user_id = self.user_id.replace("+", "");
         }
+
         visit [->:Allow:enabled==True:->](`?User)(?user_id==self.user_id) else {
             visit [->:Allow:enabled==True:->](`?Group);
         }
