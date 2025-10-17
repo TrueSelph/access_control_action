@@ -209,8 +209,10 @@ node AccessControlAction(Action) {
         groups = self.get_groups(include_users=True, group=group_names);
 
         for name in group_names {
-            if(name in groups and session_id in groups[name]) {
-                return True;
+            if group_users := self.get_groups(include_users=True, group=name) {
+                if session_id in group_users.get(name) {
+                    return True;
+                }
             }
         }
 
@@ -552,6 +554,25 @@ node AccessControlAction(Action) {
     def enable_access(user:str, group:str, channel:str, resource:str, enabled:bool=True) -> bool {
         collection = self.get_collection();
         return (collection spawn _enable_access(user=user, group=group, channel=channel, resource=resource, enabled=enabled)).result;
+    }
+
+    def export_collection() -> dict {
+        result = self.export_permissions();
+        return {
+            "permissions": result.permissions,
+            "session_groups": result.session_groups
+        };
+    }
+
+    def import_collection(data:dict, purge:bool=True) -> bool {
+        if data {
+            permissions = data.get("permissions");
+            session_groups = data.get("session_groups");
+
+            self.import_permissions(permissions, session_groups, purge);
+            return True;
+        }
+        return False;
     }
 
 }
@@ -1378,6 +1399,14 @@ walker _has_access {
     }
 
     can on_resource with ResourceItem entry {
+
+        # Allow approved WhatsApp numbers with an underscore and trailing digits
+        # (e.g., 5926431530_3452) to be recognized and processed correctly.
+        if (re.match(r"^\+?\d+_[\w-]+$", self.user_id)) or (re.match(r"^\d+_[\w-]+$", self.user_id)) {
+            self.user_id = self.user_id.split("_")[0];
+            self.user_id = self.user_id.replace("+", "");
+        }
+
         visit [->:Allow:enabled==True:->](`?User)(?user_id==self.user_id) else {
             visit [->:Allow:enabled==True:->](`?Group);
         }
